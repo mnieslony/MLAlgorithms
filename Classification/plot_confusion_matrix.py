@@ -7,10 +7,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from sklearn.utils.multiclass import unique_labels
 
-data0 = pd.read_csv("predictions/GradientBoosting_predictions_single_noVarSkewKurt.csv")
+data0 = pd.read_csv("RandomForest_predictions_UniformSample_wMRD_NoMC.csv");
+#data0 = pd.read_csv("predictions/RandomForest_predictions_single_InnerCut_noVarSkewKurt_NoLAPPDs_90_100.csv")
 print(data0.head())
-class_names = data0["11"].values
+class_names = data0["30"].values
 print("class_names: ",class_names)
+#class_types=["electron","muon"]
 class_types=["muon","electron"]
 
 #convert strings to numbers: 
@@ -76,8 +78,8 @@ def plot_confusion_matrix(y_true, y_pred, classes,
 
 np.set_printoptions(precision=2)
 
-print("data[11]:")
-print(data["11"])
+print("data[30]:")
+print(data["30"])
 print("data[Prediction]:")
 print(data["Prediction"])
 print(class_names[0])
@@ -87,11 +89,11 @@ print(class_names[3])
 print(class_names[4])
 print(class_names[5])
 # Plot non-normalized confusion matrix
-plot_confusion_matrix(data["11"], data["Prediction"], classes=class_names,
-                      title='Gradient Boosting Confusion matrix, without normalization')
+plot_confusion_matrix(data["30"], data["Prediction"], classes=class_names,
+                      title='RandomForest Confusion matrix, without normalization')
 
 # Plot normalized confusion matrix
-plot_confusion_matrix(data["11"], data["Prediction"], classes=class_names, normalize=True,
-                      title='Gradient Boosting Normalized confusion matrix')
+plot_confusion_matrix(data["30"], data["Prediction"], classes=class_names, normalize=True,
+                      title='RandomForest Normalized confusion matrix')
 
 plt.show()

@@ -7,16 +7,22 @@ from sklearn import preprocessing
 from sklearn.feature_selection import RFE
 
 #------- Merge .csv files -------
-data_e = pd.read_csv("data/pdf_electron_Parametric_single.csv", header = None)
-data_e[11] = "electron"
-data_mu = pd.read_csv("data/pdf_muon_Parametric_single.csv", header = None)
-data_mu[11] = "muon"
+#data_e = pd.read_csv("data/pdf_electron_Parametric_single.csv", header = None)
+#data_e[11] = "electron"
+#data_mu = pd.read_csv("data/pdf_muon_Parametric_single.csv", header = None)
+#data_mu[11] = "muon"
+#data_e = pd.read_csv("data/electron_nomc.csv", header = None)
+data_e = pd.read_csv("data/beam_electron_noFV_0_1100.csv", header = None)
+data_e[25] = "electron"
+#data_mu = pd.read_csv("data/muon_nomc.csv", header = None)
+data_mu = pd.read_csv("data/beam_muon_noFV_2_13.csv", header = None)
+data_mu[25] = "muon"
 
 data = pd.concat([data_e,data_mu],axis=0)
 
 # ------ Load data -----------
-X = data.iloc[:,0:11]  # ignore first column which is row Id
-y = data.iloc[:,11:12]  # Classification on the 'Species'
+X = data.iloc[:,[0,1,2,4,8,12,13,15,19,23,24]]  # ignore first column which is row Id
+y = data.iloc[:,25:26]  # Classification on the 'Species'
 
 print("X_data: ",X)
 print("Y_data: ",y)
@@ -50,7 +56,11 @@ indices = np.argsort(importances)[::-1]
 print(importances)
 print(indices)
 
-feature_labels=["Nhits","totalQ","averageT","angBary","angRMS","angVar","angSkew","angKurt","distVert","distHor","energy"]
+#feature_labels=["Nhits","totalQ","averageT","angBary","angRMS","angVar","angSkew","angKurt","distVert","distHor","energy"]
+#feature_labels_sorted = [0] * 11
+#feature_labels=["pmt_hits","pmt_totalQ","pmt_avgT","pmt_baryAngle","pmt_rmsAngle","pmt_varAngle","pmt_skewAngle","pmt_kurtAngle","pmt_rmsBary","pmt_varBary","pmt_skewBary","pmt_kurtBary","lappd_hits","lappd_avgT","lappd_baryAngle","lappd_rmsAngle","lappd_varAngle","lappd_skewAngle","lappd_kurtAngle","lappd_rmsBary","lappd_varBary","lappd_skewBary","lappd_kurtBary","pmt_fracHighestQ","pmt_fracDownstream","mrd_paddles","mrd_layers","mrd_conslayers"]
+#feature_labels_sorted = [0] * 28
+feature_labels=["pmt_hits","pmt_totalQ","pmt_avgT","pmt_rmsAngle","pmt_rmsBary","lappd_hits","lappd_avgT","lappd_rmsAngle","lappd_rmsBary","pmt_frachighestQ","pmt_fracDownstream"]
 feature_labels_sorted = [0] * 11
 
 #print the feature ranking
@@ -64,7 +74,7 @@ for f in range(X_train.shape[1]):
 plt.figure()
 plt.title("Feature importances - ExtraTreesClassifier")
 plt.bar(range(X_train.shape[1]), importances[indices],color="b",yerr=std[indices], align="center")
-plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=7)
+plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance")
 plt.savefig("FeatureImportances_ExtraTreesClassifier.pdf")
@@ -93,7 +103,7 @@ print(feature_labels_sorted)
 plt.figure()
 plt.title("Feature importances - KBest Univariate Selection")
 plt.bar(range(X_train.shape[1]), fit_kBest.scores_[indices],color="b", align="center")
-plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=7)
+plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance")
 plt.savefig("FeatureImportances_UnivariateSelection.pdf")
@@ -128,17 +138,17 @@ for f in range(X_train.shape[1]):
     feature_labels_sorted[f] = feature_labels[index]
 
 print(feature_labels_sorted)
+#importancesAU = [28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]
+#importancesAU = []
 importancesAU = [11,10,9,8,7,6,5,4,3,2,1]
 
 plt.figure()
 plt.title("Feature importances - Decision Tree")
 plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
-plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=7)
+plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
 plt.savefig("FeatureImportances_DecisionTree.pdf")
-
-
 
 # ----- Random Forest ---------------
 from sklearn.ensemble import RandomForestClassifier
@@ -161,7 +171,7 @@ print(feature_labels_sorted)
 plt.figure()
 plt.title("Feature importances - Random Forest")
 plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
-plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=7)
+plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
 #plt.show()
@@ -188,7 +198,7 @@ print(feature_labels_sorted)
 plt.figure()
 plt.title("Feature importances - XGB")
 plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
-plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=7)
+plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
 plt.savefig("FeatureImportances_XGB.pdf")
@@ -215,7 +225,7 @@ print(feature_labels_sorted)
 plt.figure()
 plt.title("Feature importances - SVM")
 plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
-plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=7)
+plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
 plt.savefig("FeatureImportances_SVM.pdf")
@@ -265,7 +275,7 @@ print(feature_labels_sorted)
 plt.figure()
 plt.title("Feature importances - Gradient Boosting")
 plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
-plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=7)
+plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
 plt.savefig("FeatureImportances_GradientBoosting.pdf")
