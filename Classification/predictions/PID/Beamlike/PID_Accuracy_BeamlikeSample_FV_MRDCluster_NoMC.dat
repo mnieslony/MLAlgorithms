@@ -1,0 +1,4 @@
+Decision Tree 	 89.943 
+Random Forest 	 92.557 
+XGBoost 	 91.986 
+SVM Classifier 	 91.251 

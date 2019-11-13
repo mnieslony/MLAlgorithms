@@ -1,0 +1,13 @@
+RingClassification:
+XGB Classifier:
+{'subsample': 0.8, 'n_estimators': 600, 'min_child_weight': 5, 'max_depth': 5, 'learning_rate': 0.01, 'gamma': 2, 'colsample_bytree': 0.6}
+
+MLP Classifier:
+ Best hyperparameters:
+{'hidden_layer_sizes': 100, 'activation': 'relu'}
+
+GradientBoosting Classifier:
+ Best hyperparameters:
+{'n_estimators': 500, 'max_depth': 3, 'learning_rate': 0.01}
+
+PID:

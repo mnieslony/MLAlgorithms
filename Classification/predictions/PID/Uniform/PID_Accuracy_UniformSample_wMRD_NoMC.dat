@@ -1,0 +1,10 @@
+Decision Tree 	 74.420 
+Random Forest 	 77.817 
+XGBoost 	 78.558 
+SVM Classifier 	 77.455 
+Nearest Neighbors Classifier 	 72.584 
+SGD Classifier 	 70.239 
+Gaussian Naive Bayes 	 62.281 
+MLP Neural network 	 78.265 
+LogisticRegression 	 69.954 
+GradientBoostingClassifier 	 75.593 

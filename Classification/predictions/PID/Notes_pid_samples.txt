@@ -1,0 +1,7 @@
+Notes regarding the different prediction samples:
+
+- Uniform:
+
+- Beamlike:
+
+- Beam:
