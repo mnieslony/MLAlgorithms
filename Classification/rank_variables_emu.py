@@ -15,22 +15,25 @@ from xgboost import XGBClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import GradientBoostingClassifier
 
-
-use_lappd_info = false
+use_lappd_info = 0
 
 #------- Merge .csv files -------
-data_e = pd.read_csv("data/beamlike_electron_FV_PMTVol_0_277.csv", header = 0)
-data_e[46] = "electron"
-data_mu = pd.read_csv("data/beam_muon_FV_PMTVol_0_4996.csv", header = 0)
-data_mu[46] = "muon"
+data_e = pd.read_csv("data/beamlike_electron_FV_PMTVol_DigitThr10_0_276.csv", header = 0)
+data_e['particleType'] = "electron"
+data_mu = pd.read_csv("data/beamlike_muon_FV_PMTVol_DigitThr10_0_499.csv", header = 0)
+data_mu['particleType'] = "muon"
 data = pd.concat([data_e,data_mu],axis=0)
+
+#balance data to be 50% electron, 50% muon
+balanced_data = data.groupby('particleType')
+balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
 
 # ------ Load data -----------
 if not use_lappd_info:
-    X = data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,35,36,37,38,39,40,43]]
+        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,35,36,37,38,39,40,43]]
 else:
-    X = data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,22,23,25,26,29,30,33,34,35,36,37,38,39,40,43]]
-Y = data.iloc[:,46:47]  # Classification on the particle type
+        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,22,23,25,26,29,30,33,34,35,36,37,38,39,40,43]]
+y = balanced_data.iloc[:,46:47]  # Classification on the particle type
 
 print("X_data: ",X)
 print("Y_data: ",y)
@@ -129,9 +132,9 @@ plt.savefig("FeatureImportances_PID_UnivariateSelection.pdf")
 # Test the ranking of variables for different models:
 
 if not use_lappd_info:
-    importancesAU = [18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]
+    importancesAU = [25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]
 else:
-    importancesAU = [24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]
+    importancesAU = [31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]
 
 print("-------------------------------------")
 print("---Recursive Feature Elimination-----")

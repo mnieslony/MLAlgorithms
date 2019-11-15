@@ -71,9 +71,9 @@ model_names=["RandomForest","MLP","XGBoost","SVM","SGD","GradientBoosting"]
 
 #read classified data from speicific classifier
 for model_name in model_names:
-    data0 = pd.read_csv("PID_"+model_name+"_predictions_Beam_FV_PMTVol_DigitThr10.csv");
+    data0 = pd.read_csv("PID_"+model_name+"_predictions_Beamlike_FV_PMTVol_DigitThr10.csv");
     print(data0.head())
-    class_names = data0["46"].values
+    class_names = data0["particleType"].values
     print("class_names: ",class_names)
     #convert strings to numbers:
     data1 = data0.replace("muon", 0)
@@ -81,13 +81,13 @@ for model_name in model_names:
 
     #explore data, make sure it's correctly read in
     print(data.head())
-    print("data[TrueLabel]:",data["46"])
+    print("data[TrueLabel]:",data["particleType"])
     print("data[Prediction]:",data["Prediction"])
 
     # Plot non-normalized confusion matrix
-    plot_confusion_matrix(data["46"], data["Prediction"], classes=class_names,
+    plot_confusion_matrix(data["particleType"], data["Prediction"], classes=class_names,
                       title=model_name+' Confusion matrix, without normalization',savepath=model_name+"_cm.pdf")
 
     # Plot normalized confusion matrix
-    plot_confusion_matrix(data["46"], data["Prediction"], classes=class_names, normalize=True,
+    plot_confusion_matrix(data["particleType"], data["Prediction"], classes=class_names, normalize=True,
                       title=model_name+' Normalized confusion matrix',savepath=model_name+"_normalized_cm.pdf")

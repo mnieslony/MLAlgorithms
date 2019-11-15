@@ -27,44 +27,47 @@ import pickle #for saving models
 
 #------- Merge .csv files -------
 
-#data_e = pd.read_csv("data/beamlike_electron_FV_MRDCluster_trunc.csv",header=None)
-data_e = pd.read_csv("data/beam_electron_FV_MRDCluster_0_4999.csv", header = None)
-#data_e = pd.read_csv("data/beamlike_electron_FV_MRDCluster_0_277.csv",header = None)
-data_e[31] = "electron"
-#data_mu = pd.read_csv("data/beamlike_muon_FV_MRDCluster_trunc.csv",header=None)
-data_mu = pd.read_csv("data/beam_muon_FV_MRDCluster_lowstat.csv",header = None)
-#data_mu = pd.read_csv("data/beam_muon_FV_MRDCluster_0_4997.csv",header=None)
-#data_mu = pd.read_csv("data/beamlike_muon_FV_MRDCluster_0_499.csv", header = None)
-data_mu[31] = "muon"
+use_lappd_info = 0    #should the model use data from the LAPPDs? 1: yes, 0: no
 
-data = pd.concat([data_e,data_mu],axis=0, ignore_index=True)    #ignore_index: one continuous index variable instead of separate ones for the 2 datasets
+#------- Merge .csv files -------
 
-X_test = data.iloc[:,0:31]  # ignore first column which is row Id, no Var+Skew+Kurt (col 5,6,7)
-Y_test = data.iloc[:,31:32]  # Classification on the 'Species'
+data_e = pd.read_csv("data/beamlike_electron_FV_PMTVol_DigitThr10_0_276.csv",header = 0)
+data_e['particleType'] = "electron"
+data_mu = pd.read_csv("data/beamlike_muon_FV_PMTVol_DigitThr10_0_499.csv",header = 0)
+data_mu['particleType'] = "muon"
+data = pd.concat([data_e,data_mu],axis=0, ignore_index = True)    #ignore_index: one continuous index variable instead of separate ones for the 2 datasets
+
+#balance data to be 50% electron, 50% muon
+balanced_data = data.groupby('particleType')
+balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
+
+if not use_lappd_info:
+        X_test = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,35,36,37,38,39,40]]
+else:
+        X_test = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,22,23,25,26,29,30,33,34,35,36,37,38,39,40]]
+Y_test = balanced_data.iloc[:,46:47]  # Classification on the particle type
 
 #specify in string which variables are not used
-removedVars = "BeamlikeSample_FV_MRDCluster_NoMC"
-
 print("X_test data: ",X_test)
 print("Y_test data: ",Y_test)
 
-feature_labels=["pmt_hits","pmt_totalQ","pmt_avgT","pmt_baryAngle","pmt_rmsAngle","pmt_varAngle","pmt_skewAngle","pmt_kurtAngle","pmt_rmsBary","pmt_varBary","pmt_skewBary","pmt_kurtBary","lappd_hits","lappd_avgT","lappd_baryAngle","lappd_rmsAngle","lappd_varAngle","lappd_skewAngle","lappd_kurtAngle","lappd_rmsBary","lappd_varBary","lappd_skewBary","lappd_kurtBary","pmt_fracHighestQ","pmt_fracDownstream","mrd_paddles","mrd_layers","mrd_conslayers","mrd_cluster"]
+feature_labels = list(X_test.columns)
 
-
-cols = [29,30]
-X_test.drop(X_test.columns[cols],axis=1,inplace=True)
 scaler = preprocessing.StandardScaler()
 X_test = pd.DataFrame(scaler.fit_transform(X_test))
 
-#filename = 'finalized_model_DecisionTree.sav'
-#filename = 'finalized_model_beamlikeMu_DecisionTree.sav'
-filename = 'finalized_modelXGBoost.sav'
-#filename = 'finalized_model_beamMu_RandomForest.sav'
-loaded_model = pickle.load(open(filename, 'rb'))
-result = loaded_model.score(X_test, Y_test)
-print(result)
+model_names=["RandomForest","XGBoost","GradientBoosting","SVM","SGD","MLP"]
+print("Evaluating model performance for PID classifiers")
+for imodel in model_names:
+    print("Evaluating performance of model ",imodel," on data set...")
+    loaded_model = pickle.load(open("models/PID/pid_model_"+imodel+".sav",'rb'))
+    score = loaded_model.score(X_test, Y_test)
+    print("Score: ",score)
 
-Y_pred = loaded_model.predict(X_test)
-accuracy = accuracy_score(Y_test,Y_pred) * 100
-print("accuracy: %1.3f\n" %accuracy)
+    Y_pred = loaded_model.predict(X_test)
+    accuracy = accuracy_score(Y_test,Y_pred) * 100
+    print("Accuracy: %1.3f\n" %accuracy)
+
+    report = classification_report(Y_test,Y_pred)
+    print("Report: ",report)
 

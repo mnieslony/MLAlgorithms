@@ -23,19 +23,25 @@ from sklearn.linear_model import SGDClassifier
 
 import pickle #for saving models
 
+use_lappd_info = 0
 
 #------- Merge .csv files -------
 
-data = pd.read_csv("data/beam_muon_FV_PMTVol_SingleMultiRing_DigitThr10_wPhi_0_4996.csv",header = 0)   #first row is header
+data_e = pd.read_csv("data/beamlike_electron_FV_PMTVol_DigitThr10_0_276.csv",header = 0)
+data_e['particleType'] = "electron"
+data_mu = pd.read_csv("data/beamlike_muon_FV_PMTVol_DigitThr10_0_499.csv",header = 0)
+data_mu['particleType'] = "muon"
+data = pd.concat([data_e,data_mu],axis=0, ignore_index = True)    #ignore_index: one continuous index variable instead of separate ones for the 2 datasets
 
-data['multiplerings'] = data['multiplerings'].astype('str')
-data.replace({'multiplerings':{'0':'1-ring',str(1):'multi-ring'}},inplace=True)
-
-balanced_data = data.groupby('multiplerings')
+#balance data to be 50% electron, 50% muon
+balanced_data = data.groupby('particleType')
 balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
 
-X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,43]]   # ignore first column which is row Id
-y = balanced_data.iloc[:,42:43]  # Classification on the boolean 'multiplerings'
+if not use_lappd_info:
+        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,35,36,37,38,39,40,43]]
+else:
+        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,22,23,25,26,29,30,33,34,35,36,37,38,39,40,43]]
+y = balanced_data.iloc[:,46:47]  # Classification on the particle type
 
 print("X_data: ",X)
 print("Y_data: ",y)
@@ -65,10 +71,10 @@ y_train2 = np.array(y_train).ravel() #Return a contiguous flattened 1-d array
 print("X_train.shape: ",X_train.shape," y_train2.shape: ",y_train2.shape, "X_test.shape: ",X_test.shape," y_test.shape: ",y_test.shape)
 
 
-def calculate_accuracy(bin_width,lower_bin,max_bins,out):
+def calculate_accuracy(lower_bin,max_bins,out):
         return sum(out[lower_bin:max_bins])/(sum(out[0:max_bins]))
 
-def calculate_accepted(bin_width,lower_bin,max_bins,out):
+def calculate_accepted(lower_bin,max_bins,out):
         return sum(out[lower_bin:max_bins])
 
 def run_model(model, model_name):
@@ -81,67 +87,69 @@ def run_model(model, model_name):
 def eval_accuracy(model, model_name):
 
     y_pred = model.predict(X_test)
-    accuracy =  accuracy_score(y_test, y_pred) * 100 
+    accuracy =  accuracy_score(y_test, y_pred) * 100
 
     y_pred_prob = model.predict_proba(X_test)
     #y_pred_logprob = model.predict_log_proba(X_test)
-
-    proba_singlering = []
-    proba_multiring = []
-    proba_multi_singlering = []
-    proba_multi_multiring = []
+            
+    proba_muon = []
+    proba_electron = []
+    proba_electron_muon = []
+    proba_electron_electron = []
     i=0
     for prob in y_pred_prob:
-            if y_test.iloc[i][0]=="1-ring":
-                    proba_singlering.append(prob[0])
-                    proba_multi_singlering.append(prob[1])
-            elif y_test.iloc[i][0]=="multi-ring":
-                    proba_multiring.append(prob[0])
-                    proba_multi_multiring.append(prob[1])
-            i=i+1    
-    out_single = plt.hist(proba_singlering,bins=100,label='true = single ring')
-    out_multi = plt.hist(proba_multiring,bins=100,label='true = multi ring')
+            if y_test.iloc[i][0]=="muon":
+                    proba_muon.append(prob[1])
+                    proba_electron_muon.append(prob[0])
+            elif y_test.iloc[i][0]=="electron":
+                    proba_electron.append(prob[1])
+                    proba_electron_electron.append(prob[0])
+            i=i+1
+
+    out_electron = plt.hist(proba_electron,bins=101,range=(0,1),label='true = electron')
+    out_muon = plt.hist(proba_muon,bins=101,range=(0,1),label='true = muon')
     plt.xlabel("pred probability")
-    plt.title(model_name+" Prediction = SingleRing")
+    plt.title(model_name+" Prediction = Muon")
     plt.legend()
-    plt.savefig(model_name+"_predictionSingleRing.pdf",format="pdf")
+    plt.savefig(model_name+"_predictionMuon.pdf",format="pdf")
     plt.clf()
 
-    out_multi_single = plt.hist(proba_multi_singlering,bins=100,label='true = single ring')
-    out_multi_multi = plt.hist(proba_multi_multiring,bins=100,label='true = multi ring')
+    out_electron_muon = plt.hist(proba_electron_muon,bins=101,range=(0,1),label='true = muon')
+    out_electron_electron = plt.hist(proba_electron_electron,bins=101,range=(0,1),label='true = electron')
     plt.xlabel("pred probability")
-    plt.title("RandomForest Prediction = MultiRing")
+    plt.title(model_name+" Prediction = Electron")
     plt.legend()
-    plt.savefig(model_name+"_predictionMultiRing.pdf",format="pdf")
+    plt.savefig(model_name+"_predictionElectron.pdf",format="pdf")
     plt.clf()
     
-
-    bin_width = out_single[1][1]-out_single[1][0]
-    print("Integral single ring: 0.5 - 1.0 (w function): ",calculate_accuracy(bin_width,50,99,out_single[0]))
-    print("Accepted single rings (50%): ",calculate_accepted(bin_width,50,99,out_single[0]))
-    print("Accepted multi rings (50%): ",calculate_accepted(bin_width,50,99,out_multi[0]))
-    print("Purity (50%): ",calculate_accepted(bin_width,50,99,out_single[0])/(calculate_accepted(bin_width,50,99,out_single[0])+calculate_accepted(bin_width,50,99,out_multi[0])))
+    print("Accuracy muon (50%): ",calculate_accuracy(50,101,out_muon[0]))
+    print("Purity muon (50%): ",calculate_accepted(50,101,out_muon[0])/(calculate_accepted(50,101,out_muon[0])+calculate_accepted(50,101,out_electron[0])))
+    print("Accuracy electron (50%): ",calculate_accuracy(50,101,out_electron_electron[0]))
+    print("Purity electron (50%): ",calculate_accepted(50,101,out_electron_electron[0])/(calculate_accepted(50,101,out_electron_electron[0])+calculate_accepted(50,101,out_electron_muon[0])))   
 
             
-    accuracy_single = []
-    purity_single = []
-    goodness_single = []
-    for bin in range(100):
-            accuracy_single.append(calculate_accuracy(bin_width,bin,99,out_single[0]))
-            if bin!=99:
-                    purity_single.append(calculate_accepted(bin_width,bin,99,out_single[0])/(calculate_accepted(bin_width,bin,99,out_single[0])+calculate_accepted(bin_width,bin,99,out_multi[0])))
+    accuracy_muon = []
+    purity_muon = []
+    goodness_muon = []
+    for bin in range(101):
+            accuracy_muon.append(calculate_accuracy(bin,101,out_muon[0]))
+            if abs(calculate_accepted(bin,101,out_muon[0]))<0.1 and abs(calculate_accepted(bin,101,out_electron[0]))<0.1:
+                purity_muon.append(0)
             else:
-                    purity_single.append(0.)
-            goodness_single.append(accuracy_single[bin]*purity_single[bin]*purity_single[bin])
+                if weighted:
+                    purity_muon.append((1-frac_electron)*calculate_accepted(bin,101,out_muon[0])/((1-frac_electron)*calculate_accepted(bin,101,out_muon[0])+frac_electron*calculate_accepted(bin,101,out_electron[0])))
+                else:
+                    purity_muon.append(calculate_accepted(bin,101,out_muon[0])/(calculate_accepted(bin,101,out_muon[0])+calculate_accepted(bin,101,out_electron[0])))
+            goodness_muon.append(accuracy_muon[bin]*purity_muon[bin]*purity_muon[bin])
 
-    x_values = np.arange(0,1,0.01)
-    plt.plot(x_values,goodness_single,label='$\mathregular{purity^2}$*efficiency',linestyle='-')
-    plt.plot(x_values,accuracy_single,color='red',label='accuracy',linestyle='-')
-    plt.plot(x_values,purity_single,color='black',label='purity',linestyle='-')
-    plt.title(model_name+" Ring Classification")
+    x_values = np.arange(0,1.01,0.01)
+    plt.plot(x_values,goodness_muon,label='$\mathregular{purity^2}$*efficiency',linestyle='-')
+    plt.plot(x_values,accuracy_muon,color='red',label='accuracy',linestyle='-')
+    plt.plot(x_values,purity_muon,color='black',label='purity',linestyle='-')
+    plt.title(model_name+" PID")
     plt.xlabel("pred probability")
     plt.legend()
-    plt.savefig(model_name+"_SingleRing_accuracypurity.pdf",format="pdf")
+    plt.savefig(model_name+"_PID_accuracypurity.pdf",format="pdf")
     plt.clf()
 
 
@@ -153,42 +161,41 @@ def plot_accuracy(model,model_name,icol,accuracy_model,purity_model,goodness_mod
     y_pred_prob = model.predict_proba(X_test)
     #y_pred_logprob = model.predict_log_proba(X_test)
 
-    proba_singlering = []
-    proba_multiring = []
-    proba_multi_singlering = []
-    proba_multi_multiring = []
+    proba_muon = []
+    proba_electron = []
+    proba_electron_muon = []
+    proba_electron_electron = []
     i=0
     for prob in y_pred_prob:
-            if y_test.iloc[i][0]=="1-ring":
-                    proba_singlering.append(prob[0])
-                    proba_multi_singlering.append(prob[1])
-            elif y_test.iloc[i][0]=="multi-ring":
-                    proba_multiring.append(prob[0])
-                    proba_multi_multiring.append(prob[1])
-            i=i+1    
-    out_single = plt.hist(proba_singlering,bins=100,label='true = single ring')
-    out_multi = plt.hist(proba_multiring,bins=100,label='true = multi ring')
+            if y_test.iloc[i][0]=="muon":
+                    proba_muon.append(prob[1])
+                    proba_electron_muon.append(prob[0])
+            elif y_test.iloc[i][0]=="electron":
+                    proba_electron.append(prob[1])
+                    proba_electron_electron.append(prob[0])
+            i=i+1
+    out_electron = plt.hist(proba_electron,bins=101,range=(0,1),label='true = electron')
+    out_muon = plt.hist(proba_muon,bins=101,range=(0,1),label='true = muon')
     plt.clf()
-
-    bin_width = out_single[1][1]-out_single[1][0]
-    accuracy_single = []
-    purity_single = []
-    goodness_single = []
-    for bin in range(100):
-            accuracy_single.append(calculate_accuracy(bin_width,bin,99,out_single[0]))
-            if bin!=99:
-                    if weighted:
-                            purity_single.append((1-frac_multi)*calculate_accepted(bin_width,bin,99,out_single[0])/((1-frac_multi)*calculate_accepted(bin_width,bin,99,out_single[0])+frac_multi*calculate_accepted(bin_width,bin,99,out_multi[0])))
-                    else:
-                            purity_single.append(calculate_accepted(bin_width,bin,99,out_single[0])/(calculate_accepted(bin_width,bin,99,out_single[0])+calculate_accepted(bin_width,bin,99,out_multi[0])))
+            
+    accuracy_muon = []
+    purity_muon = []
+    goodness_muon = []
+    for bin in range(101):
+            accuracy_muon.append(calculate_accuracy(bin,101,out_muon[0]))
+            if (abs(calculate_accepted(bin,101,out_muon[0]))<0.1) and (abs(calculate_accepted(bin,101,out_electron[0]))<0.1):
+                purity_muon.append(0)
             else:
-                    purity_single.append(0.)
-            goodness_single.append(accuracy_single[bin]*purity_single[bin]*purity_single[bin])
+                if weighted:
+                    purity_muon.append((1-frac_electron)*calculate_accepted(bin,101,out_muon[0])/((1-frac_electron)*calculate_accepted(bin,101,out_muon[0])+frac_electron*calculate_accepted(bin,101,out_electron[0])))
+                else:
+                    purity_muon.append(calculate_accepted(bin,101,out_muon[0])/(calculate_accepted(bin,101,out_muon[0])+calculate_accepted(bin,101,out_electron[0])))
+            goodness_muon.append(accuracy_muon[bin]*purity_muon[bin]*purity_muon[bin])
 
-    for i in range(len(accuracy_single)):
-            accuracy_model.append(accuracy_single[i])
-            purity_model.append(purity_single[i])
-            goodness_model.append(goodness_single[i])
+    for i in range(len(accuracy_muon)):
+            accuracy_model.append(accuracy_muon[i])
+            purity_model.append(purity_muon[i])
+            goodness_model.append(goodness_muon[i])
 
     
 
@@ -200,7 +207,7 @@ accuracy_models=[]
 purity_models=[]
 goodness_models=[]
 weighted = 0            #calculate accuracy / purity for biased (1) / unbiased (0) data sample (more 1-ring events than multi-ring events)
-frac_multi = 0.37       #only to be used when using weighted = 1
+frac_electron = 0.01       #only to be used when using weighted = 1
 
 #Plot pred comparison accuracy/purity curves between all classifiers
 
@@ -209,7 +216,6 @@ for imodel in range(len(model_names)):
         accuracy_model=[]
         purity_model=[]
         goodness_model=[]
-        #pick_model(model,model_names[imodel])
         if model_names[imodel] == "RandomForest":
                 model = RandomForestClassifier(n_estimators=100)
         elif model_names[imodel] == "MLP":
@@ -227,19 +233,21 @@ for imodel in range(len(model_names)):
         accuracy_models.append(accuracy_model)
         purity_models.append(purity_model)
         goodness_models.append(goodness_model)
+        eval_accuracy(model,model_names[imodel])
 
-x_values = np.arange(0,1,0.01)
+
+x_values = np.arange(0,1.01,0.01)
 for imodel in range(len(model_names)):
         plt.plot(x_values,accuracy_models[imodel],linestyle='-',color=model_colors[imodel],label=model_names[imodel])
 
 plt.xlabel("pred probability")
 plt.ylabel("accuracy")
-plt.title("Accuracy comparison - Ring Classification")
+plt.title("Accuracy comparison - PID")
 plt.legend()
 if weighted:
-        plt.savefig("RingClassification_AccuracyComparison_RealisticComposition.pdf",format="pdf")
+        plt.savefig("PID_AccuracyComparison_RealisticComposition.pdf",format="pdf")
 else:
-        plt.savefig("RingClassification_AccuracyComparison.pdf",format="pdf")
+        plt.savefig("PID_AccuracyComparison.pdf",format="pdf")
 plt.clf()
 
 for imodel in range(len(model_names)):
@@ -247,12 +255,12 @@ for imodel in range(len(model_names)):
 
 plt.xlabel("pred probability")
 plt.ylabel("purity")
-plt.title("Purity comparison - Ring Classification")
+plt.title("Purity comparison - PID")
 plt.legend()
 if weighted:
-        plt.savefig("RingClassification_PurityComparison_RealisticComposition.pdf",format="pdf")
+        plt.savefig("PID_PurityComparison_RealisticComposition.pdf",format="pdf")
 else:
-        plt.savefig("RingClassification_PurityComparison.pdf",format="pdf")
+        plt.savefig("PID_PurityComparison.pdf",format="pdf")
 plt.clf()
 
 for imodel in range(len(model_names)):
@@ -260,31 +268,13 @@ for imodel in range(len(model_names)):
 
 plt.xlabel("pred probability")
 plt.ylabel("$accuracy*purity^2$")
-plt.title("$Accuracy*Purity^2$ comparison - Ring Classification")
+plt.title("$Accuracy*Purity^2$ comparison - PID")
 plt.legend()
 if weighted:
-        plt.savefig("RingClassification_AccuracyPurity2Comparison_RealisticComposition.pdf",format="pdf")
+        plt.savefig("PID_AccuracyPurity2Comparison_RealisticComposition.pdf",format="pdf")
 else:
-        plt.savefig("RingClassification_AccuracyPurity2Comparison.pdf",format="pdf")
+        plt.savefig("PID_AccuracyPurity2Comparison.pdf",format="pdf")
 plt.clf()
-
-#Plot pred probability histograms & associated purity and accuracy curves
-
-for imodel in range(len(model_names)):
-        if model_names[imodel] == "RandomForest":
-                model = RandomForestClassifier(n_estimators=100)
-        elif model_names[imodel] == "MLP":
-                model = MLPClassifier(hidden_layer_sizes= 100, activation='relu')
-        elif model_names[imodel] == "XGB":
-                model = XGBClassifier(subsample=0.6, n_estimators=100, min_child_weight=5, max_depth=4, learning_rate=0.15, gamma=0.5, colsample_bytree=1.0)
-        elif model_names[imodel] == "SVM":
-                model = SVC(probability=True)
-        elif model_names[imodel] == "SGD":
-                model = OneVsRestClassifier(SGDClassifier(loss="log", max_iter=1000))
-        elif model_names[imodel] == "GradientBoosting":
-                model = GradientBoostingClassifier(learning_rate=0.01, max_depth=5, n_estimators=200)
-        run_model(model,model_names[imodel])
-        eval_accuracy(model,model_names[imodel])
 
 
 

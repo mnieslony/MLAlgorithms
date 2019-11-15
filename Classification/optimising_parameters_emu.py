@@ -11,19 +11,35 @@ from xgboost import XGBClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 
-#------- Merge electron/muon .csv files -------
-data_e = pd.read_csv("data/pdf_electron_Parametric_single_wDistInnerStr_InnerCut.csv", header = None)
-data_e[15] = "electron"
-data_mu = pd.read_csv("data/pdf_muon_Parametric_single_wDistInnerStr_InnerCut.csv", header = None)
-data_mu[15] = "muon"
-data = pd.concat([data_e,data_mu],axis=0)
 
-# ------ Load data -----------
-X = data.iloc[:,[0,1,2,3,4,8,9,13]]  # ignore first column which is row Id
-y = data.iloc[:,15:16]  # Classification on the 'Species'
+use_lappd_info = 0    #should the model use data from the LAPPDs? 1: yes, 0: no
+
+#------- Merge .csv files -------
+
+data_e = pd.read_csv("data/beamlike_electron_FV_PMTVol_DigitThr10_0_276.csv",header = 0)
+data_e['particleType'] = "electron"
+data_mu = pd.read_csv("data/beamlike_muon_FV_PMTVol_DigitThr10_0_499.csv",header = 0)
+data_mu['particleType'] = "muon"
+data = pd.concat([data_e,data_mu],axis=0, ignore_index = True)    #ignore_index: one continuous index variable instead of separate ones for the 2 datasets
+
+#balance data to be 50% electron, 50% muon
+balanced_data = data.groupby('particleType')
+balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
+
+if not use_lappd_info:
+        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,35,36,37,38,39,40]]
+else:
+        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,22,23,25,26,29,30,33,34,35,36,37,38,39,40]]
+y = balanced_data.iloc[:,46:47]  # Classification on the particle type
+
+#specify in string which variables are not used
+removedVars = "Beamlike_FV_PMTVol_DigitThr10"
 
 print("X_data: ",X)
 print("Y_data: ",y)
+
+feature_labels=list(X.columns)
+
 
 # ----- Build train and test dataset ---------
 X_train0, X_test0, y_train, y_test = train_test_split(X, y, test_size = 0.4, random_state = 100)
@@ -36,6 +52,12 @@ print("type(X_train) ",type(X_train)," type(X_train0): ",type(X_train0))
 y_train2 = np.array(y_train).ravel() #Return a contiguous flattened 1-d array
 print("X_train.shape: ",X_train.shape," y_train2.shape: ",y_train2.shape, "X_test.shape: ",X_test.shape," y_test.shape: ",y_test.shape)
 
+print('y_train2 before replacing: ',y_train2)
+#make everything binary
+y_train = np.where(y_train == 'muon', 0, 1)
+y_train2 = np.where(y_train2 == 'muon', 0, 1)
+y_test = np.where(y_test == 'muon', 0, 1)
+print('y_train2 after replacing: ',y_train2)
 
 # ------ optimise model ------ 
 def optimise_model(model, alg_name, search_method, params):

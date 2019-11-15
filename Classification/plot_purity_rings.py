@@ -65,10 +65,10 @@ y_train2 = np.array(y_train).ravel() #Return a contiguous flattened 1-d array
 print("X_train.shape: ",X_train.shape," y_train2.shape: ",y_train2.shape, "X_test.shape: ",X_test.shape," y_test.shape: ",y_test.shape)
 
 
-def calculate_accuracy(bin_width,lower_bin,max_bins,out):
+def calculate_accuracy(lower_bin,max_bins,out):
         return sum(out[lower_bin:max_bins])/(sum(out[0:max_bins]))
 
-def calculate_accepted(bin_width,lower_bin,max_bins,out):
+def calculate_accepted(lower_bin,max_bins,out):
         return sum(out[lower_bin:max_bins])
 
 def run_model(model, model_name):
@@ -99,42 +99,44 @@ def eval_accuracy(model, model_name):
                     proba_multiring.append(prob[0])
                     proba_multi_multiring.append(prob[1])
             i=i+1    
-    out_single = plt.hist(proba_singlering,bins=100,label='true = single ring')
-    out_multi = plt.hist(proba_multiring,bins=100,label='true = multi ring')
+    out_multi = plt.hist(proba_multiring,bins=101,range=(0,1),label='true = multi ring')
+    out_single = plt.hist(proba_singlering,bins=101,range=(0,1),label='true = single ring')    
     plt.xlabel("pred probability")
     plt.title(model_name+" Prediction = SingleRing")
     plt.legend()
     plt.savefig(model_name+"_predictionSingleRing.pdf",format="pdf")
     plt.clf()
 
-    out_multi_single = plt.hist(proba_multi_singlering,bins=100,label='true = single ring')
-    out_multi_multi = plt.hist(proba_multi_multiring,bins=100,label='true = multi ring')
+    out_multi_single = plt.hist(proba_multi_singlering,bins=101,range=(0,1),label='true = single ring')
+    out_multi_multi = plt.hist(proba_multi_multiring,bins=101,range=(0,1),label='true = multi ring')
     plt.xlabel("pred probability")
-    plt.title("RandomForest Prediction = MultiRing")
+    plt.title(model_name+" Prediction = MultiRing")
     plt.legend()
     plt.savefig(model_name+"_predictionMultiRing.pdf",format="pdf")
     plt.clf()
     
 
-    bin_width = out_single[1][1]-out_single[1][0]
-    print("Integral single ring: 0.5 - 1.0 (w function): ",calculate_accuracy(bin_width,50,99,out_single[0]))
-    print("Accepted single rings (50%): ",calculate_accepted(bin_width,50,99,out_single[0]))
-    print("Accepted multi rings (50%): ",calculate_accepted(bin_width,50,99,out_multi[0]))
-    print("Purity (50%): ",calculate_accepted(bin_width,50,99,out_single[0])/(calculate_accepted(bin_width,50,99,out_single[0])+calculate_accepted(bin_width,50,99,out_multi[0])))
+    print("Accuracy single ring (50%): ",calculate_accuracy(50,101,out_single[0]))
+    print("Accuracy multi rings (50%): ",calculate_accuracy(50,101,out_multi_multi[0]))
+    print("Purity single ring (50%): ",calculate_accepted(50,101,out_single[0])/(calculate_accepted(50,101,out_single[0])+calculate_accepted(50,101,out_multi[0])))
+    print("Purity multi ring (50%): ",calculate_accepted(50,101,out_multi_multi[0])/(calculate_accepted(50,101,out_multi_multi[0])+calculate_accepted(50,101,out_multi_single[0])))
 
             
     accuracy_single = []
     purity_single = []
     goodness_single = []
-    for bin in range(100):
-            accuracy_single.append(calculate_accuracy(bin_width,bin,99,out_single[0]))
-            if bin!=99:
-                    purity_single.append(calculate_accepted(bin_width,bin,99,out_single[0])/(calculate_accepted(bin_width,bin,99,out_single[0])+calculate_accepted(bin_width,bin,99,out_multi[0])))
-            else:
+    for bin in range(101):
+            accuracy_single.append(calculate_accuracy(bin,101,out_single[0]))
+            if abs(calculate_accepted(bin,101,out_single[0]))<0.1 and abs(calculate_accepted(bin,101,out_multi[0])) < 0.1:
                     purity_single.append(0.)
+            else:
+                    if weighted:
+                            purity_single.append((1-frac_multi)*calculate_accepted(bin,101,out_single[0])/((1-frac_multi)*calculate_accepted(bin,101,out_single[0])+frac_multi*calculate_accepted(bin,101,out_multi[0])))
+                    else:
+                            purity_single.append(calculate_accepted(bin,101,out_single[0])/(calculate_accepted(bin,101,out_single[0])+calculate_accepted(bin,101,out_multi[0])))
             goodness_single.append(accuracy_single[bin]*purity_single[bin]*purity_single[bin])
 
-    x_values = np.arange(0,1,0.01)
+    x_values = np.arange(0,1.01,0.01)
     plt.plot(x_values,goodness_single,label='$\mathregular{purity^2}$*efficiency',linestyle='-')
     plt.plot(x_values,accuracy_single,color='red',label='accuracy',linestyle='-')
     plt.plot(x_values,purity_single,color='black',label='purity',linestyle='-')
@@ -166,23 +168,22 @@ def plot_accuracy(model,model_name,icol,accuracy_model,purity_model,goodness_mod
                     proba_multiring.append(prob[0])
                     proba_multi_multiring.append(prob[1])
             i=i+1    
-    out_single = plt.hist(proba_singlering,bins=100,label='true = single ring')
-    out_multi = plt.hist(proba_multiring,bins=100,label='true = multi ring')
+    out_single = plt.hist(proba_singlering,bins=101,range=(0,1),label='true = single ring')
+    out_multi = plt.hist(proba_multiring,bins=101,range=(0,1),label='true = multi ring')
     plt.clf()
 
-    bin_width = out_single[1][1]-out_single[1][0]
     accuracy_single = []
     purity_single = []
     goodness_single = []
-    for bin in range(100):
-            accuracy_single.append(calculate_accuracy(bin_width,bin,99,out_single[0]))
-            if bin!=99:
-                    if weighted:
-                            purity_single.append((1-frac_multi)*calculate_accepted(bin_width,bin,99,out_single[0])/((1-frac_multi)*calculate_accepted(bin_width,bin,99,out_single[0])+frac_multi*calculate_accepted(bin_width,bin,99,out_multi[0])))
-                    else:
-                            purity_single.append(calculate_accepted(bin_width,bin,99,out_single[0])/(calculate_accepted(bin_width,bin,99,out_single[0])+calculate_accepted(bin_width,bin,99,out_multi[0])))
-            else:
+    for bin in range(101):
+            accuracy_single.append(calculate_accuracy(bin,101,out_single[0]))
+            if abs(calculate_accepted(bin,101,out_single[0]))<0.1 and abs(calculate_accepted(bin,101,out_multi[0]))<0.1:
                     purity_single.append(0.)
+            else:
+                    if weighted:
+                            purity_single.append((1-frac_multi)*calculate_accepted(bin,101,out_single[0])/((1-frac_multi)*calculate_accepted(bin,101,out_single[0])+frac_multi*calculate_accepted(bin,101,out_multi[0])))
+                    else:
+                            purity_single.append(calculate_accepted(bin,101,out_single[0])/(calculate_accepted(bin,101,out_single[0])+calculate_accepted(bin,101,out_multi[0])))
             goodness_single.append(accuracy_single[bin]*purity_single[bin]*purity_single[bin])
 
     for i in range(len(accuracy_single)):
@@ -227,8 +228,9 @@ for imodel in range(len(model_names)):
         accuracy_models.append(accuracy_model)
         purity_models.append(purity_model)
         goodness_models.append(goodness_model)
+        eval_accuracy(model,model_names[imodel])
 
-x_values = np.arange(0,1,0.01)
+x_values = np.arange(0,1.01,0.01)
 for imodel in range(len(model_names)):
         plt.plot(x_values,accuracy_models[imodel],linestyle='-',color=model_colors[imodel],label=model_names[imodel])
 
@@ -268,23 +270,6 @@ else:
         plt.savefig("RingClassification_AccuracyPurity2Comparison.pdf",format="pdf")
 plt.clf()
 
-#Plot pred probability histograms & associated purity and accuracy curves
-
-for imodel in range(len(model_names)):
-        if model_names[imodel] == "RandomForest":
-                model = RandomForestClassifier(n_estimators=100)
-        elif model_names[imodel] == "MLP":
-                model = MLPClassifier(hidden_layer_sizes= 100, activation='relu')
-        elif model_names[imodel] == "XGB":
-                model = XGBClassifier(subsample=0.6, n_estimators=100, min_child_weight=5, max_depth=4, learning_rate=0.15, gamma=0.5, colsample_bytree=1.0)
-        elif model_names[imodel] == "SVM":
-                model = SVC(probability=True)
-        elif model_names[imodel] == "SGD":
-                model = OneVsRestClassifier(SGDClassifier(loss="log", max_iter=1000))
-        elif model_names[imodel] == "GradientBoosting":
-                model = GradientBoostingClassifier(learning_rate=0.01, max_depth=5, n_estimators=200)
-        run_model(model,model_names[imodel])
-        eval_accuracy(model,model_names[imodel])
 
 
 
