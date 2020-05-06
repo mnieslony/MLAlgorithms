@@ -23,51 +23,89 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
 
-import pickle #for saving models
+import pickle #for loading/saving models
+
+import argparse #For user input
+
+#------- Parse user arguments ----
+
+parser = argparse.ArgumentParser(description='PID Model Evaluation - Overview')
+parser.add_argument("--input_e", default="data.nosync/beamlike_electron_DigitThr10_0_276_Full.csv", help = "The input electron file containing the data to be evaluated [csv-format]")
+parser.add_argument("--input_mu", default="data.nosync/beamlike_muon_Digitthr10_0_498_Full.csv", help = "The input muon file containing the data to be evaluated [csv-format]")
+parser.add_argument("--variable_names", default="VariableConfig_Full.txt", help = "File containing the list of classification variables")
+parser.add_argument("--model",default="models/PID/pid_model_MLP_beamlike_Full.sav",help="Path to classification model")
+parser.add_argument("--balance_data",default=False,help="Should the evaluated input files have balanced classes?")
+args = parser.parse_args()
+input_file_e = args.input_e
+input_file_mu = args.input_mu
+variable_file = args.variable_names
+model_file = args.model
+balance_data = args.balance_data
+
+print('PID classification evaluation: Input_file (electron): '+input_file_e+', input file (muon): '+input_file_mu+', variable file: '+variable_file+', model_file: '+model_file)
+
 
 #------- Merge .csv files -------
 
-use_lappd_info = 0    #should the model use data from the LAPPDs? 1: yes, 0: no
-
-#------- Merge .csv files -------
-
-data_e = pd.read_csv("data/beamlike_electron_FV_PMTVol_DigitThr10_0_276.csv",header = 0)
+data_e = pd.read_csv(input_file_e,header = 0)
 data_e['particleType'] = "electron"
-data_mu = pd.read_csv("data/beamlike_muon_FV_PMTVol_DigitThr10_0_499.csv",header = 0)
+data_mu = pd.read_csv(input_file_mu,header = 0)
 data_mu['particleType'] = "muon"
 data = pd.concat([data_e,data_mu],axis=0, ignore_index = True)    #ignore_index: one continuous index variable instead of separate ones for the 2 datasets
 
-#balance data to be 50% electron, 50% muon
-balanced_data = data.groupby('particleType')
-balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
-
-if not use_lappd_info:
-        X_test = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,35,36,37,38,39,40]]
+if balance_data:
+    #balance data to be 50% electron, 50% muon
+    balanced_data = data.groupby('particleType')
+    balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
 else:
-        X_test = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,22,23,25,26,29,30,33,34,35,36,37,38,39,40]]
-Y_test = balanced_data.iloc[:,46:47]  # Classification on the particle type
+    balanced_data = data
 
-#specify in string which variables are not used
-print("X_test data: ",X_test)
-print("Y_test data: ",Y_test)
+#---------- Load only specific variables of data ---------
 
-feature_labels = list(X_test.columns)
+with open(variable_file) as f:
+    subset_variables = f.read().splitlines()
+subset_variables.append('particleType')
 
-scaler = preprocessing.StandardScaler()
-X_test = pd.DataFrame(scaler.fit_transform(X_test))
+balanced_data = balanced_data[subset_variables]
 
-model_names=["RandomForest","XGBoost","GradientBoosting","SVM","SGD","MLP"]
-print("Evaluating model performance for PID classifiers")
-for imodel in model_names:
-    print("Evaluating performance of model ",imodel," on data set...")
-    loaded_model = pickle.load(open("models/PID/pid_model_"+imodel+".sav",'rb'))
-    score = loaded_model.score(X_test, Y_test)
+
+# ----- Load model & variables associated to model -------
+
+loaded_model, feature_vars, loaded_scaler = pickle.load(open(model_file,'rb'))
+
+# ------------- Number of variables check --------------
+
+eval_model = True
+if len(feature_vars) != len(subset_variables):
+    print('Number of variables does not match in model & data (Model: '+str(len(feature_vars))+', Data: '+str(len(subset_variables))+'). Abort')
+    eval_model = False
+
+if eval_model:
+    for i in range(len(feature_vars)):
+
+        if feature_vars[i] != subset_variables[i]:
+            print('Variables at index '+str(i)+' do not match in model & data (Model: '+feature_vars[i]+', Data: '+subset_variables[i]+'). Abort')
+            eval_model = False
+
+
+#-------Evaluate model performance on data set------
+
+if eval_model:
+    X_test = balanced_data.loc[:,balanced_data.columns!='particleType']
+    Y_test = balanced_data.iloc[:,-1]
+
+    X_test = pd.DataFrame(loaded_scaler.transform(X_test))
+
+    print("Evaluating model performance for PID e/mu classifier ",model_file," on data set...")
+
+    score = loaded_model.score(X_test,Y_test)
     print("Score: ",score)
 
     Y_pred = loaded_model.predict(X_test)
     accuracy = accuracy_score(Y_test,Y_pred) * 100
-    print("Accuracy: %1.3f\n" %accuracy)
+    print("Accuracy: %1.3f\n" %accuracy) 
 
     report = classification_report(Y_test,Y_pred)
     print("Report: ",report)
+
 

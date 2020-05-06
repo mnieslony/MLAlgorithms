@@ -25,36 +25,84 @@ from sklearn.linear_model import LogisticRegression
 
 import pickle #for saving & loading models
 
+import argparse #For user input
+
+#------- Parse user arguments ----
+
+parser = argparse.ArgumentParser(description='Ring Classification Model Evaluation - Overview')
+parser.add_argument("--input", default="data.nosync/beam_muon_FV_PMTVol_SingleMultiRing_DigitThr10_wPhi_0_4996_Old.csv", help = "The input electron file containing the data to be evaluated [csv-format]")
+parser.add_argument("--variable_names", default="VariableConfig_Old.txt", help = "File containing the list of classification variables")
+parser.add_argument("--model",default="models/RingClassification/ringcounting_model_beam_Old_MLP.sav",help="Path to classification model")
+parser.add_argument("--balance_data",default=False,help="Should the evaluated input files have balanced classes?")
+args = parser.parse_args()
+input_file = args.input
+variable_file = args.variable_names
+model_file = args.model
+balance_data = args.balance_data
+
+print('Ring Classification evaluation: Input_file: '+input_file+', variable file: '+variable_file+', model_file: '+model_file)
+
+
 #------- Merge .csv files -------
 
-data = pd.read_csv("data/beam_muon_FV_PMTVol_SingleMultiRing_DigitThr10_wPhi_0_4996.csv",header=0)    #first row is header
+data = pd.read_csv(input_file,header=0)    #first row is header
 data['multiplerings'] = data['multiplerings'].astype('str')
 data.replace({'multiplerings':{'0':'1-ring',str(1):'multi-ring'}},inplace=True)
-X_test = data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34]]
-Y_test = data.iloc[:,42:43]  # Classification on 'multiplerings' property of events
 
-print("X_test data: ",X_test)
-print("Y_test data: ",Y_test)
+#------- Balance data (if specified) -------
 
-feature_labels=list(X_test.columns)
-print("Length of feature_labels: %i" %(len(feature_labels)))
+if balance_data:
+	#balance data to be 50% single-rings, 50% multi-rings
+    balanced_data = data.groupby('multiplerings')
+    balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
+else:
+    balanced_data = data
 
-scaler = preprocessing.StandardScaler()
-X_test = pd.DataFrame(scaler.fit_transform(X_test))
+ #---------- Load only specific variables of data ---------
 
-model_names=["RandomForest","XGBoost","GradientBoosting","SVM","SGD","MLP"]
+with open(variable_file) as f:
+    subset_variables = f.read().splitlines()
+subset_variables.append('multiplerings')
 
-print("Evaluating model performance for ring classifiers")
-for imodel in model_names:
-        print("Evaluating performance of model ",imodel," on data set...")
-        loaded_model = pickle.load(open("models/RingClassification/ringcounting_model_"+imodel+".sav", 'rb'))
-        score = loaded_model.score(X_test, Y_test)
-        print("Score: ",score)
+balanced_data = balanced_data[subset_variables]
 
-        Y_pred = loaded_model.predict(X_test)
-        accuracy = accuracy_score(Y_test,Y_pred) * 100
-        print("Accuracy: %1.3f\n" %accuracy)
+# ----- Load model & variables associated to model -------
 
-        report = classification_report(Y_test,Y_pred)
-        print("Report: ",report)
+loaded_model, feature_vars, loaded_scaler = pickle.load(open(model_file,'rb'))
+
+# ------------- Number of variables check --------------
+
+eval_model = True
+if len(feature_vars) != len(subset_variables):
+    print('Number of variables does not match in model & data (Model: '+str(len(feature_vars))+', Data: '+str(len(subset_variables))+'). Abort')
+    eval_model = False
+
+if eval_model:
+    for i in range(len(feature_vars)):
+
+        if feature_vars[i] != subset_variables[i]:
+            print('Variables at index '+str(i)+' do not match in model & data (Model: '+feature_vars[i]+', Data: '+subset_variables[i]+'). Abort')
+            eval_model = False
+
+
+#-------Evaluate model performance on data set------
+
+if eval_model:
+
+	X_test = balanced_data.loc[:,balanced_data.columns!='multiplerings']
+	Y_test = balanced_data.iloc[:,-1]
+
+	X_test = pd.DataFrame(loaded_scaler.transform(X_test))
+
+	print("Evaluating model performance for RingClassification classifier ",model_file," on data set...")
+
+	score = loaded_model.score(X_test, Y_test)
+	print("Score: ",score)
+
+	Y_pred = loaded_model.predict(X_test)
+	accuracy = accuracy_score(Y_test,Y_pred) * 100
+	print("Accuracy: %1.3f\n" %accuracy)
+
+	report = classification_report(Y_test,Y_pred)
+	print("Report: ",report)
 

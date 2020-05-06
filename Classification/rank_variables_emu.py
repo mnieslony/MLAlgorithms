@@ -15,30 +15,65 @@ from xgboost import XGBClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import GradientBoostingClassifier
 
-use_lappd_info = 0
+import argparse #For user input
+
+#------- Parse user arguments ----
+
+parser = argparse.ArgumentParser(description='PID Rank variables - Overview')
+parser.add_argument("--input_e", default="data.nosync/beamlike_electron_DigitThr10_0_276_Full.csv", help = "The input electron file containing the data to be evaluated [csv-format]")
+parser.add_argument("--input_mu", default="data.nosync/beamlike_muon_Digitthr10_0_498_Full.csv", help = "The input muon file containing the data to be evaluated [csv-format]")
+parser.add_argument("--balance_data",default=True,help="Should the two classes in the dataset be balanced 50/50?")
+parser.add_argument("--variable_names", default="VariableConfig_Full.txt", help = "File containing the list of classification variables")
+parser.add_argument("--dataset_name",default="beamlike", help = "Keyword describing dataset name (used to label output files)")
+
+args = parser.parse_args()
+input_file_e = args.input_e
+input_file_mu = args.input_mu
+balance_data = args.balance_data
+variable_file = args.variable_names
+dataset_name = args.dataset_name
+
+print('PID Rank variables initialization: Electron input file: '+input_file_e+', muon input file: '+input_file_mu+', variable config file: '+variable_file)
+
 
 #------- Merge .csv files -------
-data_e = pd.read_csv("data/beamlike_electron_FV_PMTVol_DigitThr10_0_276.csv", header = 0)
+data_e = pd.read_csv(input_file_e, header = 0)
 data_e['particleType'] = "electron"
-data_mu = pd.read_csv("data/beamlike_muon_FV_PMTVol_DigitThr10_0_499.csv", header = 0)
+data_mu = pd.read_csv(input_file_mu, header = 0)
 data_mu['particleType'] = "muon"
 data = pd.concat([data_e,data_mu],axis=0)
 
-#balance data to be 50% electron, 50% muon
-balanced_data = data.groupby('particleType')
-balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
 
-# ------ Load data -----------
-if not use_lappd_info:
-        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,33,34,35,36,37,38,39,40,43]]
+#-------- Balance data set (if specified) ----------
+
+if balance_data:
+    #Balance data to be 50% electron, 50% muon
+    balanced_data = data.groupby('particleType')
+    balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
 else:
-        X = balanced_data.iloc[:,[0,1,2,3,4,5,8,9,12,13,14,15,17,19,20,21,22,23,25,26,29,30,33,34,35,36,37,38,39,40,43]]
-y = balanced_data.iloc[:,46:47]  # Classification on the particle type
+    balanced_data = data
 
-print("X_data: ",X)
-print("Y_data: ",y)
 
-# build train and test dataset
+#---------- Load only specific variables of data ---------
+
+with open(variable_file) as f:
+    subset_variables = f.read().splitlines()
+subset_variables.append('particleType')
+
+balanced_data = balanced_data[subset_variables]
+
+variable_config = variable_file[15:variable_file.find('.txt')]
+print('Variable configuration: ',variable_config)
+
+# ---------- Fill x & y vectors with data ----------------
+
+X = balanced_data.iloc[:,balanced_data.columns!='particleType']
+y = balanced_data.iloc[:,-1]  # Classification on the particle type
+
+print("Preview X (classification variables): ",X.head())
+print("Preview Y (class names): ",y.head())
+
+# Build train and test dataset
 X_train0, X_test0, y_train, y_test = train_test_split(X, y, test_size = 0.4, random_state = 100)
 
 # Scale data (training set) to 0 mean and unit standard deviation.
@@ -69,21 +104,20 @@ print(indices)
 feature_labels=list(X.columns)
 feature_labels_sorted = [0] * len(feature_labels)
 
-#print the feature ranking (Extra Trees Classifier)
-print("ExtraTreesClassifier: ")
+# Print the feature ranking (Extra Trees Classifier)
 print("Feature ranking: ")
 for f in range(X_train.shape[1]):
     print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
     feature_labels_sorted[f] = feature_labels[indices[f]]
 
-#plot the feature ranking (ExtraTrees Classifier)
+# Plot the feature ranking (ExtraTrees Classifier)
 plt.figure()
 plt.title("Feature importances - ExtraTreesClassifier")
 plt.bar(range(X_train.shape[1]), importances[indices],color="b",yerr=std[indices], align="center")
 plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance")
-plt.savefig("FeatureImportances_PID_ExtraTreesClassifier.pdf")
+plt.savefig("plots/PID/FeatureImportance/FeatureImportances_PID_"+dataset_name+"_"+variable_config+"_ExtraTreesClassifier.pdf")
 
 
 #-------------------------------------------------------
@@ -97,7 +131,6 @@ print("-------------------------------------")
 kBest = SelectKBest(score_func=f_classif, k=5)
 fit_kBest = kBest.fit(X_train,y_train2)
 np.set_printoptions(precision=3)
-print("Univariate Selection:")
 print(fit_kBest.scores_)
 indices=np.argsort(fit_kBest.scores_)[::-1]
 print(indices)
@@ -112,11 +145,14 @@ plt.bar(range(X_train.shape[1]), fit_kBest.scores_[indices],color="b", align="ce
 plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance")
-plt.savefig("FeatureImportances_PID_UnivariateSelection.pdf")
+plt.savefig("plots/PID/FeatureImportance/FeatureImportances_PID_"+dataset_name+"_"+variable_config+"_UnivariateSelection.pdf")
 
-#------Principal Component Analysis------------------------
-#from sklearn.decomposition import PCA
-# not really sure how to interprete reduced data --> omit for now
+#---------------------------------------------------
+#------Principal Component Analysis (PCA)-----------
+#---------------------------------------------------
+
+# from sklearn.decomposition import PCA
+# Not really sure how to interprete reduced data --> omit for now
 
 #pca = PCA(n_components=5)
 #fit_pca = pca.fit(X_train)
@@ -131,10 +167,11 @@ plt.savefig("FeatureImportances_PID_UnivariateSelection.pdf")
 
 # Test the ranking of variables for different models:
 
-if not use_lappd_info:
-    importancesAU = [25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]
-else:
-    importancesAU = [31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]
+importancesAU = []
+for i in range(len(subset_variables)-1):
+    importancesAU.append(len(subset_variables)-1-i)
+
+print('Importances (A.U.), after initialization: ',importancesAU)
 
 print("-------------------------------------")
 print("---Recursive Feature Elimination-----")
@@ -146,7 +183,9 @@ model = RandomForestClassifier(n_estimators=100)
 rfe_random = RFE(model,1)
 rfe_random.fit(X_train,y_train2)
 
-print("Random Forest:")
+print("///////////////////")
+print("///Random Forest///")
+print("///////////////////")
 print(rfe_random.support_)
 print(rfe_random.ranking_)
 
@@ -163,7 +202,7 @@ plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
 plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
-plt.savefig("FeatureImportances_PID_RandomForest.pdf")
+plt.savefig("plots/PID/FeatureImportance/FeatureImportances_PID_"+dataset_name+"_"+variable_config+"_RandomForest.pdf")
 
 # ----- xgboost ------------
 
@@ -171,7 +210,9 @@ model = XGBClassifier(subsample=0.6, n_estimators=100, min_child_weight=5, max_d
 rfe_xgb = RFE(model,1)
 rfe_xgb.fit(X_train,y_train2)
 
-print("XGB classifier:")
+print("////////////////////")
+print("///XGB classifier///")
+print("////////////////////")
 print(rfe_xgb.support_)
 print(rfe_xgb.ranking_)
 
@@ -188,7 +229,7 @@ plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
 plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
-plt.savefig("FeatureImportances_PID_XGB.pdf")
+plt.savefig("plots/PID/FeatureImportance/FeatureImportances_PID_"+dataset_name+"_"+variable_config+"_XGB.pdf")
 
 # ------ SVM Classifier ----------------
 #gives error message: The classifier does not expose "coef_" or "feature_importances_" attributes (if not specifying kernel="linear")
@@ -197,7 +238,9 @@ model = SVC(probability=True, kernel="linear")
 rfe_svc = RFE(model,1)
 rfe_svc.fit(X_train,y_train2)
 
-print("SVC classifier:")
+print("//////////////////////")
+print("///SVC classifier/////")
+print("/////////////////////")
 print(rfe_svc.support_)
 print(rfe_svc.ranking_)
 
@@ -214,7 +257,7 @@ plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
 plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
-plt.savefig("FeatureImportances_PID_SVM.pdf")
+plt.savefig("plots/PID/FeatureImportance/FeatureImportances_PID_"+dataset_name+"_"+variable_config+"_SVM.pdf")
 
 
 #----------- GradientBoostingClassifier -----------
@@ -223,7 +266,9 @@ model = GradientBoostingClassifier(learning_rate=0.01, max_depth=8, n_estimators
 rfe_gradientboosting = RFE(model,1)
 rfe_gradientboosting.fit(X_train,y_train2)
 
-print("Gradient Boosting classifier:")
+print("////////////////////////////////////")
+print("///Gradient Boosting classifier/////")
+print("////////////////////////////////////")
 print(rfe_gradientboosting.support_)
 print(rfe_gradientboosting.ranking_)
 
@@ -240,5 +285,5 @@ plt.bar(range(X_train.shape[1]), importancesAU,color="b", align="center")
 plt.xticks(range(X_train.shape[1]), feature_labels_sorted, rotation=45, fontsize=4)
 plt.xlim([-1, X_train.shape[1]])
 plt.ylabel("Importance [A.U.]")
-plt.savefig("FeatureImportances_PID_GradientBoosting.pdf")
+plt.savefig("plots/PID/FeatureImportance/FeatureImportances_PID_"+dataset_name+"_"+variable_config+"_GradientBoosting.pdf")
 

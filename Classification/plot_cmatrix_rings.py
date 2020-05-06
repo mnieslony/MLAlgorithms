@@ -7,6 +7,29 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from sklearn.utils.multiclass import unique_labels
 
+import argparse #For user input
+
+
+#------- Parse user arguments ----
+
+parser = argparse.ArgumentParser(description='Ring Classification Confusion Matrix - Overview')
+parser.add_argument("--dataset_name", default="beam", help = "The name of the data set (used to label the file with predictions)")
+parser.add_argument("--variable_config", default="Old", help = "The variable configuration name")
+parser.add_argument("--model_name",default="MLP",help="Classification model name. Options: RandomForest, XGBoost, SVM, SGD, MLP, GradientBoosting, All")
+args = parser.parse_args()
+dataset_name = args.dataset_name
+variable_config = args.variable_config
+model_name = args.model_name
+
+print('RingClassification Confusion Matrix initialization: Dataset name: '+dataset_name+', model name: '+model_name)
+
+
+#-------- Confusion matrix --------
+
+# ------------------------------------------------------------------
+# -------- plot_confusion_matrix: Plot (normalized) CM -------------
+# ------------------------------------------------------------------
+
 class_types=["1-ring","multi-ring"]
 
 def plot_confusion_matrix(y_true, y_pred, classes,
@@ -67,27 +90,43 @@ def plot_confusion_matrix(y_true, y_pred, classes,
 
 np.set_printoptions(precision=2)
 
-model_names=["RandomForest","MLP","XGBoost","SVM","SGD","GradientBoosting"]
 
-#read classified data from speicific classifier
+# -------- Create list of classifiers to look at ---------
+if model_name == "All":
+    model_names=["RandomForest","MLP","XGBoost","SVM","SGD","GradientBoosting"]
+else:
+    model_names=[model_name]
+
+
+# ------- Read predicted data from specific classifier, create CM -------
+
 for model_name in model_names:
-    data0 = pd.read_csv("RingCounting_"+model_name+"_predictions_Beam_FV_PMTVol_DigitThr10.csv");
-    print(data0.head())
+
+    print(' ')
+    print('///////////////////////////////////////////////////')
+    print('Computing confusion matrix for '+model_name+'...')
+    print('///////////////////////////////////////////////////')
+    print(' ')
+
+
+    data0 = pd.read_csv("predictions/RingClassification/RingClassification_"+model_name+"_predictions_"+dataset_name+"_"+variable_config+".csv");
+    print("Data preview [not converted]: ",data0.head())
     class_names = data0["multiplerings"].values
-    print("class_names: ",class_names)
-    #convert strings to numbers:
+    print("Ring Classification - Class_names: ",class_names)
+    
+    # Convert strings to numbers (1-ring = 0, multi-ring = 1):
     data1 = data0.replace("1-ring", 0)
     data = data1.replace("multi-ring", 1)
 
     #explore data, make sure it's correctly read in
-    print(data.head())
-    print("data[TrueLabel]:",data["multiplerings"])
-    print("data[Prediction]:",data["Prediction"])
+    print("Data preview [converted]: ",data.head())
+    print("Data[TrueLabel] shape:",data["multiplerings"])
+    print("Data[Prediction] shape:",data["Prediction"])
 
     # Plot non-normalized confusion matrix
     plot_confusion_matrix(data["multiplerings"], data["Prediction"], classes=class_names,
-                      title=model_name+' Confusion matrix, without normalization',savepath=model_name+"_cm.pdf")
+                      title=model_name+' Confusion matrix, without normalization',savepath="plots/RingClassification/ConfusionMatrix/"+model_name+"_"+dataset_name+"_"+variable_config+"_cm.pdf")
 
     # Plot normalized confusion matrix
     plot_confusion_matrix(data["multiplerings"], data["Prediction"], classes=class_names, normalize=True,
-                      title=model_name+' Normalized confusion matrix',savepath=model_name+"_normalized_cm.pdf")
+                      title=model_name+' Normalized confusion matrix',savepath="plots/RingClassification/ConfusionMatrix/"+model_name+"_"+dataset_name+"_"+variable_config+"_normalized_cm.pdf")
