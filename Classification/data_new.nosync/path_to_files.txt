@@ -1,0 +1,2 @@
+The data files containing the classification variables can be found on the Fermi cluster at
+/pnfs/annie/persistent/users/mnieslon/classification/data_new.nosync
