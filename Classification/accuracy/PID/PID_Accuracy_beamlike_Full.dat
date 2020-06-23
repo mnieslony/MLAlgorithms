@@ -1,0 +1,19 @@
+Random Forest 	 89.485 
+Random Forest 	 89.654 
+XGBoost 	 91.801 
+SVM Classifier 	 91.541 
+SGD Classifier 	 88.847 
+MLP Neural network 	 92.673 
+GradientBoostingClassifier 	 87.715 
+Random Forest 	 89.654 
+XGBoost 	 91.281 
+SVM Classifier 	 91.450 
+SGD Classifier 	 88.704 
+MLP Neural network 	 92.439 
+GradientBoostingClassifier 	 87.376 
+Random Forest 	 89.654 
+XGBoost 	 91.424 
+SVM Classifier 	 91.411 
+SGD Classifier 	 87.975 
+MLP Neural network 	 92.478 
+GradientBoostingClassifier 	 87.441 

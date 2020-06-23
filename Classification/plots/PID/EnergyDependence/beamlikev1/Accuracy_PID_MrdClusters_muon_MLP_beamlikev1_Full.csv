@@ -1,0 +1,5 @@
+plot_type,lower_bin,n_total,n_incorrect,accuracy,error_accuracy
+muon,0,2693,261,0.9116452268111036,0.005221829578295787
+muon,1,837,5,0.994061757719715,0.0026477659562866187
+muon,2,0,0,0.0,0.0
+muon,3,0,0,0.0,0.0

@@ -1,0 +1,2 @@
+The trained models can be found on the Fermi cluster at the following path:
+/pnfs/annie/persistent/users/mnieslon/classification/models/

@@ -1,0 +1,2 @@
+The files can be found on the Fermi cluster at the following path:
+/pnfs/annie/persistent/users/mnieslon/classification/additional_event_info.nosync/

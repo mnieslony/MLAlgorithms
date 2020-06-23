@@ -1,0 +1,5 @@
+plot_type,lower_bin,n_total,n_incorrect,accuracy,error_accuracy
+overall,0,6267,535,0.9213466627462511,0.003264012377404922
+overall,1,867,15,0.9829931972789115,0.004353637854135281
+overall,2,0,0,0.0,0.0
+overall,3,0,0,0.0,0.0
