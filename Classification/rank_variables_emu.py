@@ -56,7 +56,8 @@ else:
 
 #---------- Load only specific variables of data ---------
 
-with open(variable_file) as f:
+variable_file_path = "variable_config/"+variable_file
+with open(variable_file_path) as f:
     subset_variables = f.read().splitlines()
 subset_variables.append('particleType')
 

@@ -31,10 +31,10 @@ import argparse #For user input
 #------- Parse user arguments ----
 
 parser = argparse.ArgumentParser(description='PID classification - Overview')
-parser.add_argument("--input", default="data.nosync/beamlike_electron_DigitThr10_0_276_Full.csv", help = "The input file containing the classification variables [csv-format]")
+parser.add_argument("--input", default="data_old.nosync/beamlike_electron_DigitThr10_0_276_Full.csv", help = "The input file containing the classification variables [csv-format]")
 parser.add_argument("--output", default="pid_predictions_mlp.txt", help = "The output file containing the predictions of the classifier")
 parser.add_argument("--variable_names", default="VariableConfig_Full.txt", help = "File containing the list of classification variables")
-parser.add_argument("--model",default="models/PID/pid_model_MLP_beamlike_Full.sav",help="Path to classification model")
+parser.add_argument("--model",default="models/PID/pid_model_beamlikev1_Full_MLP.sav",help="Path to classification model")
 args = parser.parse_args()
 input_file = args.input
 output_file = args.output
@@ -49,7 +49,8 @@ data = pd.read_csv(input_file,header=0)
 
 #---------- Load only specific variables of data ---------
 
-with open(variable_file) as f:
+variable_file_path = "variable_config/"+variable_file
+with open(variable_file_path) as f:
     subset_variables = f.read().splitlines()
 
 data = data[subset_variables]
@@ -90,8 +91,9 @@ if do_prediction:
 	#X.to_csv("X_load.csv")
 
 	Y_pred = loaded_model.predict(X)
+	Y_pred_prob = loaded_model.predict_proba(X)
 
 	with open(output_file,'w') as f:
-		for item in Y_pred:
-			print(item,file=f)
+		for item in range(len(Y_pred)):
+			print(str(Y_pred[item])+','+str(Y_pred_prob[item][1]),file=f)
 

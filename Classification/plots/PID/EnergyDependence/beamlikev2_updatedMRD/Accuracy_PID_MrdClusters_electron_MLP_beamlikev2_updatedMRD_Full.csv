@@ -1,0 +1,5 @@
+plot_type,lower_bin,n_total,n_incorrect,accuracy,error_accuracy
+electron,0,20678,2531,0.8909474772717481,0.0020460474219272254
+electron,1,889,57,0.9397463002114165,0.007736626014151412
+electron,2,0,0,0.0,0.0
+electron,3,0,0,0.0,0.0

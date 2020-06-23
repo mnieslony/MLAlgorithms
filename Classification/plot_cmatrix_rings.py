@@ -111,7 +111,7 @@ for model_name in model_names:
 
     data0 = pd.read_csv("predictions/RingClassification/RingClassification_"+model_name+"_predictions_"+dataset_name+"_"+variable_config+".csv");
     print("Data preview [not converted]: ",data0.head())
-    class_names = data0["multiplerings"].values
+    class_names = data0["MCMultiRing"].values
     print("Ring Classification - Class_names: ",class_names)
     
     # Convert strings to numbers (1-ring = 0, multi-ring = 1):
@@ -120,13 +120,13 @@ for model_name in model_names:
 
     #explore data, make sure it's correctly read in
     print("Data preview [converted]: ",data.head())
-    print("Data[TrueLabel] shape:",data["multiplerings"])
+    print("Data[TrueLabel] shape:",data["MCMultiRing"])
     print("Data[Prediction] shape:",data["Prediction"])
 
     # Plot non-normalized confusion matrix
-    plot_confusion_matrix(data["multiplerings"], data["Prediction"], classes=class_names,
+    plot_confusion_matrix(data["MCMultiRing"], data["Prediction"], classes=class_names,
                       title=model_name+' Confusion matrix, without normalization',savepath="plots/RingClassification/ConfusionMatrix/"+model_name+"_"+dataset_name+"_"+variable_config+"_cm.pdf")
 
     # Plot normalized confusion matrix
-    plot_confusion_matrix(data["multiplerings"], data["Prediction"], classes=class_names, normalize=True,
+    plot_confusion_matrix(data["MCMultiRing"], data["Prediction"], classes=class_names, normalize=True,
                       title=model_name+' Normalized confusion matrix',savepath="plots/RingClassification/ConfusionMatrix/"+model_name+"_"+dataset_name+"_"+variable_config+"_normalized_cm.pdf")

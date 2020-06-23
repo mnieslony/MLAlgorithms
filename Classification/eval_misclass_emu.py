@@ -23,7 +23,7 @@ dataset_name = args.dataset_name
 
 #------- Read .csv files -------
 
-filename_additional = "predictions/PID/PID_AddEvInfo_"+dataset_name+"_"+variable_config+".csv"
+filename_additional = "additional_event_info.nosync/PID/PID_AddEvInfo_"+dataset_name+"_"+variable_config+".csv"
 filename_predictions = "predictions/PID/PID_"+model_name+"_predictions_"+dataset_name+"_"+variable_config+".csv"
 
 var_info = pd.read_csv(filename_additional, header = 0)
@@ -42,8 +42,9 @@ list_upperbin=[]
 list_binwidth=[]
 
 create_plots = True
+plot_variables_path = "variable_config/"+plot_variables
 
-with open(plot_variables) as f:
+with open(plot_variables_path) as f:
     for line in f:
         currentline = line.split(",")
         print('length of currentline: ',len(currentline))
@@ -140,6 +141,9 @@ def create_lists(varname):
 
 def plot_ratios(lower,upper,bin_width,varname,plot_type):
     
+    acc_file = open("plots/PID/EnergyDependence/Accuracy_PID_"+varname+"_"+plot_type+"_"+model_name+"_"+dataset_name+"_"+variable_config+".csv","w")
+    acc_file.write("plot_type,lower_bin,n_total,n_incorrect,accuracy,error_accuracy\n")
+
     bins_var = np.arange(lower,upper,bin_width)
     if plot_type is 'electron':
         _bins, _edges = np.histogram(correct_e,bins_var)
@@ -170,36 +174,42 @@ def plot_ratios(lower,upper,bin_width,varname,plot_type):
         label_correct = "correct (mu)"
         label_incorrect = "incorrect (mu)"
 
-    ax.errorbar(edges,bins,yerr=bins3,color="blue",lw=2,label=label_correct)
-    ax.scatter(edges,bins,s=10,color="blue")
-    ax.errorbar(edges2,bins2,yerr=bins4,color="orange",lw=2,label=label_incorrect)
-    ax.scatter(edges2,bins2,s=10,color="orange")
+    ax.errorbar(edges,bins,yerr=bins3,fmt='',color="blue",lw=1,label=label_correct)
+    ax.scatter(edges,bins,s=5,color="blue")
+    ax.errorbar(edges2,bins2,yerr=bins4,fmt='',color="orange",lw=1,label=label_incorrect)
+    ax.scatter(edges2,bins2,s=5,color="orange")
     ax.set_ylabel('#')
     leg = ax.legend()
 
     if plot_type is 'electron':
-        ax.set_title("Misclassified electrons")
+        ax.set_title("Misclassified electrons ("+dataset_name+" dataset)")
     elif plot_type is 'muon':
-        ax.set_title('Misclassified muons')
+        ax.set_title('Misclassified muons ('+dataset_name+' dataset)')
     else:
-        ax.set_title('Misclassified events')
+        ax.set_title('Misclassified events ('+dataset_name+' dataset)')
 
     ax = fig.add_subplot(2,1,2)
     rat = getRatio(bins2,bins)
     error_rat = getRatioError(bins2,bins)
-    ax.errorbar(edges,rat,yerr=error_rat,fmt='o-',color='red')
-    ax.set_ylim(min(rat)-0.05,max(rat)+0.05)
+    plt.grid()
+    ax.set_axisbelow(True)
+    ax.errorbar(edges,rat,yerr=error_rat,fmt='none',lw=1,color='red')
+    ax.scatter(edges,rat,s=5,color='red')
+    #ax.set_ylim(min(rat)-0.05,max(rat)+0.05)
+    ax.set_ylim(-0.05,1.1)
     ax.set_xlabel(varname)
     ax.set_ylabel("Accuracy")
                      
-    plt.grid()
     if plot_type is 'electron':
-        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Ratio_"+varname+"_electron.pdf")
+        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Ratio_"+dataset_name+"_"+variable_config+"_"+varname+"_electron.pdf")
     elif plot_type is 'muon':
-        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Ratio_"+varname+"_muon.pdf")
+        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Ratio_"+dataset_name+"_"+variable_config+"_"+varname+"_muon.pdf")
     else:
-        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Ratio_"+varname+"_overall.pdf")
+        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Ratio_"+dataset_name+"_"+variable_config+"_"+varname+"_overall.pdf")
     plt.close("all")
+
+    for i in range(len(edges)):
+        acc_file.write(plot_type+","+str(edges[i])+","+str(bins[i])+","+str(bins2[i])+","+str(rat[i])+","+str(error_rat[i])+"\n")
 
 # ------------------------------------------------------------------------------------------
 # ------ plot_histograms: Plot histograms for number of classified events (variable) -------
@@ -223,19 +233,19 @@ def plot_histograms(lower,upper,bin_width,varname,plot_type):
     plt.ylabel('#')
 
     if plot_type is 'electron':
-        plt.title("Misclassified electrons")
+        plt.title("Misclassified electrons ("+dataset_name+" dataset)")
     elif plot_type is 'muon':
-        plt.title('Misclassified muons')
+        plt.title('Misclassified muons ('+dataset_name+' dataset)')
     else:
-        plt.title('Misclassified events')
+        plt.title('Misclassified events ('+dataset_name+' dataset)')
     plt.legend(loc='upper left')
 
     if plot_type is 'electron':
-        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Hist_"+varname+"_electron.pdf")
+        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Hist_"+dataset_name+"_"+variable_config+"_"+varname+"_electron.pdf")
     elif plot_type is 'muon':
-        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Hist_"+varname+"_muon.pdf")
+        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Hist_"+dataset_name+"_"+variable_config+"_"+varname+"_muon.pdf")
     else:
-        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Hist_"+varname+"_overall.pdf")
+        plt.savefig("plots/PID/EnergyDependence/PID_Classification_Hist_"+dataset_name+"_"+variable_config+"_"+varname+"_overall.pdf")
     plt.close("all")
 
 

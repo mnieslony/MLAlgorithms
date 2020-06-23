@@ -31,7 +31,7 @@ import argparse #For user input
 #------- Parse user arguments ----
 
 parser = argparse.ArgumentParser(description='Ring Classification - Overview')
-parser.add_argument("--input", default="data.nosync/beam_muon_FV_PMTVol_SingleMultiRing_DigitThr10_wPhi_0_4996_Old.csv", help = "The input file containing the classification variables [csv-format]")
+parser.add_argument("--input", default="data_old.nosync/beam_muon_FV_PMTVol_SingleMultiRing_DigitThr10_wPhi_0_4996_Old.csv", help = "The input file containing the classification variables [csv-format]")
 parser.add_argument("--output", default="ringcounting_predictions_mlp.txt", help = "The output file containing the predictions of the classifier")
 parser.add_argument("--variable_names", default="VariableConfig_Old.txt", help = "File containing the list of classification variables")
 parser.add_argument("--model",default="models/RingClassification/ringcounting_model_beam_Old_MLP.sav",help="Path to classification model")
@@ -89,8 +89,9 @@ if do_prediction:
 	X = pd.DataFrame(scaler_model.transform(X))
 
 	Y_pred = loaded_model.predict(X)
+	Y_pred_prob = loaded_model.predict_proba(X)
 
 	with open(output_file,'w') as f:
-		for item in Y_pred:
-			print(item,file=f)
+		for item in range(len(Y_pred)):
+			print(str(Y_pred[item])+','+str(Y_pred_prob[item][0]),file=f)
 

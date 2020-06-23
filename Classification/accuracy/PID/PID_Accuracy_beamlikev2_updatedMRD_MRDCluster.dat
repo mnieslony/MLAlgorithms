@@ -1,0 +1,6 @@
+Random Forest 	 89.765 
+XGBoost 	 90.093 
+SVM Classifier 	 90.717 
+SGD Classifier 	 87.415 
+MLP Neural network 	 91.574 
+GradientBoostingClassifier 	 86.228 

@@ -23,7 +23,7 @@ dataset_name = args.dataset_name
 
 #------- Read .csv files -------
 
-filename_additional = "predictions/RingClassification/RingClassification_AddEvInfo_"+dataset_name+"_"+variable_config+".csv"
+filename_additional = "additional_event_info.nosync/RingClassification/RingClassification_AddEvInfo_"+dataset_name+"_"+variable_config+".csv"
 filename_predictions = "predictions/RingClassification/RingClassification_"+model_name+"_predictions_"+dataset_name+"_"+variable_config+".csv"
 
 var_info = pd.read_csv(filename_additional, header = 0)
@@ -43,7 +43,8 @@ list_binwidth=[]
 
 create_plots = True
 
-with open(plot_variables) as f:
+plot_variables_path = "variable_config/"+plot_variables
+with open(plot_variables_path) as f:
     for line in f:
         currentline = line.split(",")
         print('length of currentline: ',len(currentline))
@@ -63,9 +64,10 @@ for variable in list_plot_variables:
     print('Preview data for variable ',variable,': ',var_info[variable].head())
 
 
-print("Preview list of true classes: ",predictions['multiplerings'].head())
-print("Preview list of predicted classes: ",predictions['multiplerings'].head())
-
+#print("Preview list of true classes: ",predictions['multiplerings'].head())
+#print("Preview list of predicted classes: ",predictions['multiplerings'].head())
+print("Preview list of true classes: ",predictions['MCMultiRing'].head())
+print("Preview list of predicted classes: ",predictions['MCMultiRing'].head())
 
 correct = list()
 correct_single = list()
@@ -141,6 +143,95 @@ def create_lists(varname):
                 incorrect_multi.append(variable[i])
                 pred_incorrect_single.append(variable[i])
 
+# -----------------------------------------------------------------------------------
+# ------ create_lists: Special list creation for Pi+/Pi-/Pi0/K+/K- energies ---------
+# -----------------------------------------------------------------------------------
+
+def create_lists_pip():
+
+    variable=var_info["Pip"]
+    variableE = var_info["Pim"]
+
+    for i in range(len(true)):
+        if true[i]=="multi-ring":
+            if variable[i]==1:
+                if pred[i]=="multi-ring":
+                    correct.append(variableE[i])
+                else:
+                    incorrect.append(variableE[i])
+
+def create_lists_pim():
+
+    variable1=var_info["Pip"]
+    variable2=var_info["Pim"]
+    variable3=var_info["Pi0"]
+
+    for i in range(len(true)):
+        if true[i]=="multi-ring":
+            if variable1[i]==0:
+                if variable2[i]==1:
+                    if pred[i]=="multi-ring":
+                        correct.append(variable3[i])
+                    else:
+                        incorrect.append(variable3[i])
+
+def create_lists_pi0():
+
+    variable1=var_info["Pip"]
+    variable2=var_info["Pim"]
+    variable3=var_info["Pi0"]
+    variable4=var_info["Kp"]
+
+    for i in range(len(true)):
+        if true[i]=="multi-ring":
+            if variable1[i]==0:
+                if variable2[i]==0:
+                    if variable3[i]==1:
+                        if pred[i]=="multi-ring":
+                            correct.append(variable4[i])
+                        else:
+                            incorrect.append(variable4[i])
+
+def create_lists_kp():
+
+    variable1=var_info["Pip"]
+    variable2=var_info["Pim"]
+    variable3=var_info["Pi0"]
+    variable4=var_info["Kp"]
+    variable5=var_info["Km"]
+
+    for i in range(len(true)):
+        if true[i]=="multi-ring":
+            if variable1[i]==0:
+                if variable2[i]==0:
+                    if variable3[i]==0:
+                        if variable4[i]==1:
+                            if pred[i]=="multi-ring":
+                                correct.append(variable5[i])
+                            else:
+                                incorrect.append(variable5[i])
+
+def create_lists_km():
+
+    variable1=var_info["Pip"]
+    variable2=var_info["Pim"]
+    variable3=var_info["Pi0"]
+    variable4=var_info["Kp"]
+    variable5=var_info["Km"]
+    variable6=var_info["Column1"]
+
+    for i in range(len(true)):
+        if true[i]=="multi-ring":
+            if variable1[i]==0:
+                if variable2[i]==0:
+                    if variable3[i]==0:
+                        if variable4[i]==0:
+                            if variable5[i]==1:
+                                if pred[i]=="multi-ring":
+                                    correct.append(variable6[i])
+                                else:
+                                    incorrect.append(variable6[i])
+
 # ---------------------------------------------------------------------------------
 # ------ plot_ratios: Plot ratios of correctly classified events (variable) -------
 # ---------------------------------------------------------------------------------
@@ -148,6 +239,9 @@ def create_lists(varname):
 def plot_ratios(lower,upper,bin_width,varname,plot_type):
 
     print("Executing plot_ratios: plot_type = ",plot_type)
+
+    acc_file = open("plots/RingClassification/EnergyDependence/Accuracy_RingClassification_"+varname+"_"+plot_type+"_"+model_name+"_"+dataset_name+"_"+variable_config+".csv","w")
+    acc_file.write("plot_type,lower_bin,n_total,n_incorrect,accuracy,error_accuracy\n")
     
     bins_var = np.arange(lower,upper,bin_width)
     if plot_type == '1-ring':
@@ -177,36 +271,42 @@ def plot_ratios(lower,upper,bin_width,varname,plot_type):
         label_correct = "correct (multi-ring)"
         label_incorrect = "incorrect (multi-ring)"
 
-    ax.errorbar(edges,bins,yerr=bins3,color="blue",lw=2,label=label_correct)
-    ax.scatter(edges,bins,s=10,color="blue")
-    ax.errorbar(edges2,bins2,yerr=bins4,color="orange",lw=2,label=label_incorrect)
-    ax.scatter(edges2,bins2,s=10,color="orange")
+    ax.errorbar(edges,bins,yerr=bins3,fmt='',color="blue",lw=1,label=label_correct)
+    ax.scatter(edges,bins,s=5,color="blue")
+    ax.errorbar(edges2,bins2,yerr=bins4,fmt='',color="orange",lw=1,label=label_incorrect)
+    ax.scatter(edges2,bins2,s=5,color="orange")
     ax.set_ylabel('#')
     leg = ax.legend()
 
     if plot_type == '1-ring':
-        ax.set_title("Misclassified single rings")
+        ax.set_title("Misclassified single rings ("+dataset_name+" dataset)")
     elif plot_type == 'multi-ring':
-        ax.set_title('Misclassified multi rings')
+        ax.set_title('Misclassified multi rings ('+dataset_name+' dataset)')
     else:
-        ax.set_title('Misclassified events')
+        ax.set_title('Misclassified events ('+dataset_name+' dataset)')
 
     ax = fig.add_subplot(2,1,2)
     rat = getRatio(bins2,bins)
     error_rat = getRatioError(bins2,bins)
-    ax.errorbar(edges,rat,yerr=error_rat,fmt='o-',color='red')
-    ax.set_ylim(min(rat)-0.05,max(rat)+0.05)
+    plt.grid()
+    ax.set_axisbelow(True)
+    ax.errorbar(edges,rat,yerr=error_rat,fmt='none',lw=1,color='red')
+    ax.scatter(edges,rat,s=5,color='red')
+    #ax.set_ylim(min(rat)-0.05,max(rat)+0.05)
+    ax.set_ylim(-0.05,1.1)
     ax.set_xlabel(varname)
     ax.set_ylabel("Accuracy")
                      
-    plt.grid()
     if plot_type == '1-ring':
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Ratio_"+varname+"_single.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Ratio_"+dataset_name+"_"+variable_config+"_"+varname+"_single.pdf")
     elif plot_type == 'multi-ring':
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Ratio_"+varname+"_multi.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Ratio_"+dataset_name+"_"+variable_config+"_"+varname+"_multi.pdf")
     else:
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Ratio_"+varname+"_overall.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Ratio_"+dataset_name+"_"+variable_config+"_"+varname+"_overall.pdf")
     plt.close("all")
+
+    for i in range(len(edges)):
+        acc_file.write(plot_type+","+str(edges[i])+","+str(bins[i])+","+str(bins2[i])+","+str(rat[i])+","+str(error_rat[i])+"\n")
 
 # ------------------------------------------------------------------------------------------
 # ------ plot_precision: Plot histograms for precision of classification (variable) --------
@@ -215,6 +315,9 @@ def plot_ratios(lower,upper,bin_width,varname,plot_type):
 def plot_precision(lower,upper,bin_width,varname,plot_type):
 
     print("Executing plot_precision: plot_type = ",plot_type)
+
+    prec_file = open("plots/RingClassification/EnergyDependence/Precision_RingClassification_"+varname+"_"+plot_type+"_"+model_name+"_"+dataset_name+"_"+variable_config+".csv","w")
+    prec_file.write("plot_type,lower_bin,n_total,n_incorrect,accuracy,error_accuracy\n")
 
     bins_var = np.arange(lower,upper,bin_width)
     if plot_type == '1-ring':
@@ -240,10 +343,10 @@ def plot_precision(lower,upper,bin_width,varname,plot_type):
         label_correct = "correct (multi-ring)"
         label_incorrect = "incorrect (multi-ring)"
 
-    ax.errorbar(edges,bins,yerr=bins3,color="blue",lw=2,label=label_correct)
-    ax.scatter(edges,bins,s=10,color="blue")
-    ax.errorbar(edges2,bins2,yerr=bins4,color="orange",lw=2,label=label_incorrect)
-    ax.scatter(edges2,bins2,s=10,color="orange")
+    ax.errorbar(edges,bins,yerr=bins3,color="blue",fmt='',lw=1,label=label_correct)
+    ax.scatter(edges,bins,s=5,color="blue")
+    ax.errorbar(edges2,bins2,yerr=bins4,color="orange",fmt='',lw=1,label=label_incorrect)
+    ax.scatter(edges2,bins2,s=5,color="orange")
     ax.set_ylabel('#')
     leg = ax.legend()
 
@@ -255,17 +358,23 @@ def plot_precision(lower,upper,bin_width,varname,plot_type):
     ax = fig.add_subplot(2,1,2)
     rat = getRatio(bins2,bins)
     error_rat = getRatioError(bins2,bins)
-    ax.errorbar(edges,rat,yerr=error_rat,fmt='o-',color='red')
-    ax.set_ylim(min(rat)-0.05,max(rat)+0.05)
+    plt.grid()
+    ax.set_axisbelow(True)
+    ax.errorbar(edges,rat,yerr=error_rat,fmt='none',l2=1,color='red')
+    ax.scatter(edges,rat,s=5,color='red')
+    #ax.set_ylim(min(rat)-0.05,max(rat)+0.05)
+    ax.set_ylim(-0.05,1.1)
     ax.set_xlabel(varname)
     ax.set_ylabel("Precision")
                      
-    plt.grid()
     if plot_type == '1-ring':
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Precision_"+varname+"_single.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Precision_"+dataset_name+"_"+variable_config+"_"+varname+"_single.pdf")
     else:
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Precision_"+varname+"_multi.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Precision_"+dataset_name+"_"+variable_config+"_"+varname+"_multi.pdf")
     plt.close("all")
+
+    for i in range(len(edges)):
+        prec_file.write(plot_type+","+str(edges[i])+","+str(bins[i])+","+str(bins2[i])+","+str(rat[i])+","+str(error_rat[i])+"\n")
 
 # ------------------------------------------------------------------------------------------
 # ------ plot_histograms: Plot histograms for number of classified events (variable) -------
@@ -289,19 +398,19 @@ def plot_histograms(lower,upper,bin_width,varname,plot_type):
     plt.ylabel('#')
 
     if plot_type == '1-ring':
-        plt.title("Misclassified 1-rings")
+        plt.title("Misclassified 1-rings ("+dataset_name+" dataset)")
     elif plot_type == 'multi-ring':
-        plt.title('Misclassified multi rings')
+        plt.title('Misclassified multi rings ('+dataset_name+' dataset)')
     else:
-        plt.title('Misclassified events')
+        plt.title('Misclassified events ('+dataset_name+' dataset)')
     plt.legend(loc='upper left')
 
     if plot_type == '1-ring':
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Hist_"+varname+"_single.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Hist_"+dataset_name+"_"+variable_config+"_"+varname+"_single.pdf")
     elif plot_type == 'multi-ring':
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Hist_"+varname+"_multi.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Hist_"+dataset_name+"_"+variable_config+"_"+varname+"_multi.pdf")
     else:
-        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Hist_"+varname+"_overall.pdf")
+        plt.savefig("plots/RingClassification/EnergyDependence/RingClassification_Classification_Hist_"+dataset_name+"_"+variable_config+"_"+varname+"_overall.pdf")
     plt.close("all")
 
 
@@ -327,10 +436,45 @@ for i in range(len(list_plot_variables)):
     pred_incorrect_single.clear()
     pred_incorrect_multi.clear()
 
-    create_lists(list_plot_variables[i])
-    for plottype in plot_types:
-        plot_histograms(list_lowerbin[i],list_upperbin[i],list_binwidth[i],list_plot_variables[i],plottype)
-        plot_ratios(list_lowerbin[i],list_upperbin[i],list_binwidth[i],list_plot_variables[i],plottype)
-        if plottype == '1-ring' or plottype == 'multi-ring':
-            plot_precision(list_lowerbin[i],list_upperbin[i],list_binwidth[i],list_plot_variables[i],plottype)
+    if list_plot_variables[i] != "Pip":
+        create_lists(list_plot_variables[i])
+
+        for plottype in plot_types:
+            plot_histograms(list_lowerbin[i],list_upperbin[i],list_binwidth[i],list_plot_variables[i],plottype)
+            plot_ratios(list_lowerbin[i],list_upperbin[i],list_binwidth[i],list_plot_variables[i],plottype)
+            if plottype == '1-ring' or plottype == 'multi-ring':
+                plot_precision(list_lowerbin[i],list_upperbin[i],list_binwidth[i],list_plot_variables[i],plottype)
+
+    else:
+        create_lists_pip()
+        plot_histograms(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"PiPlus",'overall')
+        plot_ratios(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"PiPlus",'overall')
+
+        correct.clear()
+        incorrect.clear()
+
+        create_lists_pim()
+        plot_histograms(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"PiMinus",'overall')
+        plot_ratios(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"PiMinus",'overall')
+
+        correct.clear()
+        incorrect.clear()
+
+        create_lists_pi0()
+        plot_histograms(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"Pi0",'overall')
+        plot_ratios(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"Pi0",'overall')
+
+        correct.clear()
+        incorrect.clear()
+
+        create_lists_kp()
+        plot_histograms(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"KPlus",'overall')
+        plot_ratios(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"KPlus",'overall')
+
+        correct.clear()
+        incorrect.clear()
+
+        create_lists_km()
+        plot_histograms(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"KMinus",'overall')
+        plot_ratios(list_lowerbin[i],list_upperbin[i],list_binwidth[i],"KMinus",'overall')
 

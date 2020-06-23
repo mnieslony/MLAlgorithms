@@ -27,12 +27,11 @@ import pickle #for loading/saving models
 
 import argparse #For user input
 
-
 #------- Parse user arguments ----
 
 parser = argparse.ArgumentParser(description='PID Plot purity/efficiency curves - Overview')
-parser.add_argument("--input_e", default="data.nosync/beamlike_electron_DigitThr10_0_276_Full.csv", help = "The input electron file containing the data to be evaluated [csv-format]")
-parser.add_argument("--input_mu", default="data.nosync/beamlike_muon_Digitthr10_0_498_Full.csv", help = "The input muon file containing the data to be evaluated [csv-format]")
+parser.add_argument("--input_e", default="data_new.nosync/beamlike_electrons_histogram_DigitThr10_0_999_Full.csv", help = "The input electron file containing the data to be evaluated [csv-format]")
+parser.add_argument("--input_mu", default="data_new.nosync/beamlike_muons_histogram_DigitThr10_0_399_Full.csv", help = "The input muon file containing the data to be evaluated [csv-format]")
 parser.add_argument("--variable_names", default="VariableConfig_Full.txt", help = "File containing the list of classification variables")
 parser.add_argument("--dataset_name",default="beamlike", help = "Keyword describing dataset name (used to label output files)")
 parser.add_argument("--model_name",default="MLP",help="Classification model name. Options: RandomForest, XGBoost, SVM, SGD, MLP, GradientBoosting, All")
@@ -49,7 +48,6 @@ frac_electron = args.frac_electron
 balance_data = True     # Needs to be true, otherwise the weighted calculations are going to be wrong
 
 print('PID Purity/Efficiency curves initialization: Electron data set: '+input_file_e+', muon data set: '+input_file_mu+', variable file: '+variable_file+', model: '+model_name)
-
 
 #------- Merge .csv files -------
 
@@ -71,7 +69,8 @@ else:
 
 #---------- Load only specific variables of data ---------
 
-with open(variable_file) as f:
+variable_file_path = "variable_config/"+variable_file
+with open(variable_file_path) as f:
     subset_variables = f.read().splitlines()
 subset_variables.append('particleType')
 
@@ -149,6 +148,11 @@ def run_model(model, model_name):
     
 def plot_purity(model, model_name):
 
+    purity_file = open("plots/PID/PredProbability/PurityValues_PID_"+model_name+"_"+dataset_name+"_"+variable_config+".csv","w")
+    purity_file_weighted = open("plots/PID/PredProbability/PurityValuesWeighted_PID_"+model_name+"_"+dataset_name+"_"+variable_config+".csv","w")
+    purity_file.write("probability,efficiency,purity,rel_uncertainty,efficiency*purity,efficiency*purity**2\n")
+    purity_file_weighted.write("probability,efficiency,purity,rel_uncertainty,efficiency*purity,efficiency*purity**2\n")
+
     y_pred = model.predict(X_test)
     accuracy =  accuracy_score(y_test, y_pred) * 100
 
@@ -176,9 +180,13 @@ def plot_purity(model, model_name):
     out_muon = plt.hist(proba_muon,bins=101,range=(0,1),label='true = muon')
     out_electron = plt.hist(proba_electron,bins=101,alpha=0.5,range=(0,1),label='true = electron')
     plt.xlabel("pred probability")
+    plt.ylabel("#")
     plt.title(model_name+" Prediction = Muon")
     plt.legend()
-    plt.savefig("plots/PID/PredProbability/"+model_name+"_probMuon.pdf",format="pdf")
+    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_"+dataset_name+"_"+variable_config+"_probMuon.pdf",format="pdf")
+
+    plt.yscale("log")
+    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_"+dataset_name+"_"+variable_config+"_probMuon_log.pdf",format="pdf")
     plt.clf()
 
     out_electron_muon = plt.hist(proba_electron_muon,bins=101,range=(0,1),label='true = muon')
@@ -223,6 +231,12 @@ def plot_purity(model, model_name):
         goodness_weighted_muon.append(temp_eff*temp_purity_weighted*temp_purity_weighted)
         rel_uncertainty_muon.append(temp_rel_uncertainty)
         rel_uncertainty_weighted_muon.append(temp_rel_uncertainty_weighted)
+        purity_file.write(str(bin/100)+","+str(temp_eff)+","+str(temp_purity)+","+str(temp_rel_uncertainty)+","+str(temp_eff*temp_purity)+","+str(temp_eff*temp_purity*temp_purity)+"\n")
+        purity_file_weighted.write(str(bin/100)+","+str(temp_eff)+","+str(temp_purity_weighted)+","+str(temp_rel_uncertainty_weighted)+","+str(temp_eff*temp_purity_weighted)+","+str(temp_eff*temp_purity_weighted*temp_purity_weighted)+"\n")
+
+
+    purity_file.close()
+    purity_file_weighted.close()
 
     # Plot efficiency/purity curves (unweighted)
 
@@ -233,8 +247,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,purity_muon,color='black',label='purity',linestyle='-')
     plt.title(model_name+" PID")
     plt.xlabel("pred probability (muon)")
+    plt.ylabel("purity/efficiency")
     plt.legend()
-    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_effpurity.pdf",format="pdf")
+    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_"+dataset_name+"_"+variable_config+"_effpurity.pdf",format="pdf")
     plt.clf()
 
     # Plot efficiency/purity curves (weighted)
@@ -245,8 +260,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,purity_weighted_muon,color='black',label='purity',linestyle='-')
     plt.title(model_name+" PID (weighted)")
     plt.xlabel("pred probability (muon)")
+    plt.ylabel("purity/efficiency")
     plt.legend()
-    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_effpurity_weighted.pdf",format="pdf")
+    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_"+dataset_name+"_"+variable_config+"_effpurity_weighted.pdf",format="pdf")
     plt.clf()
 
     # Plot relative uncertainty curves (unweighted)
@@ -255,8 +271,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,rel_uncertainty_muon,color='black',label='rel uncertainty',linestyle='-')
     plt.title(model_name+" PID")
     plt.xlabel("pred probability (muon)")
+    plt.ylabel("$\sqrt{S+2B}/S$")
     plt.legend()
-    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_reluncert.pdf",format="pdf")
+    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_"+dataset_name+"_"+variable_config+"_reluncert.pdf",format="pdf")
     plt.clf()
  
     # Plot relative uncertainty curves (weighted)
@@ -265,8 +282,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,rel_uncertainty_weighted_muon,color='black',label='rel uncertainty',linestyle='-')
     plt.title(model_name+" PID")
     plt.xlabel("pred probability (muon)")
+    plt.ylabel("$\sqrt{S+2B}/S$")
     plt.legend()
-    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_reluncert_weighted.pdf",format="pdf")
+    plt.savefig("plots/PID/PredProbability/"+model_name+"_PID_"+dataset_name+"_"+variable_config+"_reluncert_weighted.pdf",format="pdf")
     plt.clf()
 
 
@@ -306,6 +324,7 @@ def eval_purity(model,model_name,icol,eff_model,purity_model,eff_purity_model,go
     out_muon = plt.hist(proba_muon,bins=101,range=(0,1),label='true = muon')
     out_electron = plt.hist(proba_electron,bins=101,alpha=0.5,range=(0,1),label='true = electron')
     plt.xlabel("pred probability")
+    plt.ylabel("#")
     plt.title(model_name+" Prediction = Muon")
     plt.legend()
     plt.clf()
@@ -489,7 +508,7 @@ for imodel in range(len(model_names)):
 
 plt.xlabel("pred probability")
 plt.ylabel("$efficiency*purity^2$")
-plt.title("$Efficiency*Purity^2$ comparison - PID")
+plt.title("$Efficiency*Purity^2$ comparison - PID (weighted)")
 plt.legend()
 plt.savefig("plots/PID/PredProbability/PID_EffPurity2Comparison_weighted_"+dataset_name+"_"+variable_config+".pdf",format="pdf")
 plt.clf()
@@ -511,10 +530,8 @@ for imodel in range(len(model_names)):
 
 plt.xlabel("pred probability")
 plt.ylabel("$\sqrt{S+2B}/S$")
-plt.title("Rel. uncertainty comparison - PID")
+plt.title("Rel. uncertainty comparison - PID (weighted)")
 plt.legend()
 plt.savefig("plots/PID/PredProbability/PID_RelUncertainty_weighted_"+dataset_name+"_"+variable_config+".pdf",format="pdf")
 plt.clf()
-
-
 

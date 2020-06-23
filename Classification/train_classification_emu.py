@@ -33,12 +33,12 @@ import argparse #For user input
 #------- Parse user arguments ----
 
 parser = argparse.ArgumentParser(description='PID classification training - Overview')
-parser.add_argument("--input_e", default="data.nosync/beamlike_electron_DigitThr10_0_276_Full.csv", help = "The electron input file [csv-format]")
-parser.add_argument("--input_mu", default="data.nosync/beamlike_muon_DigitThr10_0_498_Full.csv", help = "The muon input file [csv-format]")
+parser.add_argument("--input_e", default="data_new.nosync/beamlike_electrons_histogram_DigitThr10_0_999_Full.csv", help = "The electron input file [csv-format]")
+parser.add_argument("--input_mu", default="data_new.nosync/beamlike_muons_histogram_DigitThr10_0_399_Full.csv", help = "The muon input file [csv-format]")
 parser.add_argument("--status_suffix", default="Full.csv", help = "The strings of the input file to be replaced when looking at the status file.")
 parser.add_argument("--variable_names", default="VariableConfig_Full.txt", help = "File containing the list of classification variables")
 parser.add_argument("--model_name",default="MLP",help="Classififier to use for training. Options: RandomForest, XGBoost, SVM, SGD, MLP, GradientBoosting, All")
-parser.add_argument("--dataset_name",default="beamlike",help="Keyword describing dataset name (used to label output files)")
+parser.add_argument("--dataset_name",default="beamlikev2",help="Keyword describing dataset name (used to label output files)")
 parser.add_argument("--balance_data",default=True,help="Should the dataset be made even for the training process?")
 parser.add_argument("--plot_roc",default=False,help="Shall ROC curve be drawn?")
 parser.add_argument("--plot_prec_recall",default=False,help="Shall Precision-Recall curve be drawn?")
@@ -70,7 +70,8 @@ data = pd.concat([data_e,data_mu], axis=0, ignore_index = True)    #ignore_index
 
 #------ Load variable config --------
 
-with open(variable_file) as f:
+variable_file_path = "variable_config/"+variable_file
+with open(variable_file_path) as f:
     subset_variables = f.read().splitlines()
 subset_classification_vars = subset_variables
 subset_variables.append('particleType')
@@ -128,13 +129,13 @@ X_train0, X_test0, y_train, y_test = train_test_split(X, y, test_size = 0.4, ran
 
 X_test_indices = X_test0.index.get_level_values(1)
 print("Test set indices: ",X_test_indices)
-index_file = open("predictions/PID/PID_Indices_"+dataset_name+"_"+variable_config+".dat","w")
+index_file = open("indices/PID/PID_Indices_"+dataset_name+"_"+variable_config+".dat","w")
 for index in X_test_indices:
     index_file.write("%i\n" % index)
 index_file.close()
 
 #X_test0[feature_labels_additional].to_csv('predictions/PID/PID_AddEvInfo_'+dataset_name+'_'+variable_config+'.csv',index=False)
-X_test0.to_csv('predictions/PID/PID_AddEvInfo_'+dataset_name+'_'+variable_config+'.csv',index=False)
+X_test0.to_csv('additional_event_info.nosync/PID/PID_AddEvInfo_'+dataset_name+'_'+variable_config+'.csv',index=False)
 
 # After saving the information, drop the additional variables from the training & test data
 
@@ -191,7 +192,7 @@ def run_model(model, alg_name):
     y_pred = model.predict(X_test)
     accuracy =  accuracy_score(y_test, y_pred) * 100 #returns the fraction of correctly classified samples
     print("Algorithm name: ",alg_name)
-    file = open("predictions/PID/PID_Accuracy_"+dataset_name+"_"+variable_config+".dat","a")
+    file = open("accuracy/PID/PID_Accuracy_"+dataset_name+"_"+variable_config+".dat","a")
     file.write("%s \t %1.3f \n" % (alg_name, accuracy))
     file.close()
     

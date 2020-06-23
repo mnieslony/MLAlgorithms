@@ -30,11 +30,12 @@ import argparse #For user input
 #------- Parse user arguments ----
 
 parser = argparse.ArgumentParser(description='Ring Classification Plot purity/efficiency curves - Overview')
-parser.add_argument("--input", default="data.nosync/beam_muon_FV_PMTVol_SingleMultiRing_DigitThr10_wPhi_0_4996_Old.csv", help = "The input electron file containing the data to be evaluated [csv-format]")
-parser.add_argument("--variable_names", default="VariableConfig_Old.txt", help = "File containing the list of classification variables")
+parser.add_argument("--input", default="data_new.nosync/beam_DigitThr10_0_4996_Full.csv", help = "The input electron file containing the data to be evaluated [csv-format]")
+parser.add_argument("--variable_names", default="VariableConfig_Full.txt", help = "File containing the list of classification variables")
 parser.add_argument("--dataset_name",default="beam", help = "Keyword describing dataset name (used to label output files)")
 parser.add_argument("--model_name",default="MLP",help="Classification model name. Options: RandomForest, XGBoost, SVM, SGD, MLP, GradientBoosting, All")
 parser.add_argument("--frac_multi",default=0.37,help="Fraction of multi-ring events in the beam sample.")
+parser.add_argument("--status_suffix",default="Full.csv",help="Name of the last portion of the data file.")
 
 args = parser.parse_args()
 input_file = args.input
@@ -42,6 +43,7 @@ variable_file = args.variable_names
 dataset_name = args.dataset_name
 model_name = args.model_name
 frac_multi = args.frac_multi
+status_suffix = args.status_suffix
 
 balance_data = True     # Needs to be true, otherwise the weighted calculations are going to be wrong
 
@@ -51,22 +53,26 @@ print('Ring Classification Purity/Efficiency curves initialization: Data set: '+
 #------- Read in .csv file -------
 
 data = pd.read_csv(input_file,header = 0)   #first row is header
-data['multiplerings'] = data['multiplerings'].astype('str')
-data.replace({'multiplerings':{'0':'1-ring',str(1):'multi-ring'}},inplace=True)
+input_file_additional = input_file[0:input_file.find(status_suffix)]+"status.csv"
+data_additional = pd.read_csv(input_file_additional, header = 0)
+data = pd.concat([data,data_additional], axis=1, sort = False)
+data['MCMultiRing'] = data['MCMultiRing'].astype('str')
+data.replace({'MCMultiRing':{'0':'1-ring',str(1):'multi-ring'}},inplace=True)
 
 #--------- Balance data (if specified) ---------
 
 if balance_data:
-    balanced_data = data.groupby('multiplerings')
+    balanced_data = data.groupby('MCMultiRing')
     balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
 else:
     balanced_data = data
 
 #---------- Load only specific variables of data ---------
 
-with open(variable_file) as f:
+variable_file_path = "variable_config/"+variable_file
+with open(variable_file_path) as f:
     subset_variables = f.read().splitlines()
-subset_variables.append('multiplerings')
+subset_variables.append('MCMultiRing')
 
 balanced_data = balanced_data[subset_variables]
 
@@ -75,7 +81,7 @@ print('Variable configuration: ',variable_config)
 
 # ---------- Fill x & y vectors with data ----------------
 
-X = balanced_data.iloc[:,balanced_data.columns!='multiplerings']
+X = balanced_data.iloc[:,balanced_data.columns!='MCMultiRing']
 y = balanced_data.iloc[:,-1]  # Classification on the single-ring/multi-ring class
 print("Preview X (classification variables): ",X.head())
 print("Preview Y (class names): ",y.head())
@@ -136,13 +142,17 @@ def run_model(model, model_name):
     y_pred = model.predict(X_test)        
     report = classification_report(y_test, y_pred) 
     print(report)
-    
 
 # ------------------------------------------------------------------
 # ---- plot_purity: Plot efficiency/purity/goodness curves----------
 # ------------------------------------------------------------------
     
 def plot_purity(model, model_name):
+
+    purity_file = open("plots/RingClassification/PredProbability/PurityValues_RingClassification_"+model_name+"_"+dataset_name+"_"+variable_config+".csv","w")
+    purity_file_weighted = open("plots/RingClassification/PredProbability/PurityValuesWeighted_RingClassification_"+model_name+"_"+dataset_name+"_"+variable_config+".csv","w")
+    purity_file.write("probability,efficiency,purity,rel_uncertainty,efficiency*purity,efficiency*purity**2\n")
+    purity_file_weighted.write("probability,efficiency,purity,rel_uncertainty,efficiency*purity,efficiency*purity**2\n")
 
     y_pred = model.predict(X_test)
     accuracy =  accuracy_score(y_test, y_pred) * 100 
@@ -175,7 +185,10 @@ def plot_purity(model, model_name):
     plt.xlabel("pred probability")
     plt.title(model_name+" Prediction = SingleRing")
     plt.legend()
-    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_probSingleRing.pdf",format="pdf")
+    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_"+dataset_name+"_"+variable_config+"_probSingleRing.pdf",format="pdf")
+    
+    plt.yscale("log")
+    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_"+dataset_name+"_"+variable_config+"_probSingleRing_log.pdf",format="pdf")
     plt.clf()
 
     out_multi_single = plt.hist(proba_multi_singlering,bins=101,range=(0,1),label='true = single ring')
@@ -220,6 +233,11 @@ def plot_purity(model, model_name):
         goodness_weighted_single.append(temp_eff*temp_purity_weighted*temp_purity_weighted)
         rel_uncertainty_single.append(temp_rel_uncertainty)
         rel_uncertainty_weighted_single.append(temp_rel_uncertainty_weighted)
+        purity_file.write(str(bin/100)+","+str(temp_eff)+","+str(temp_purity)+","+str(temp_rel_uncertainty)+","+str(temp_eff*temp_purity)+","+str(temp_eff*temp_purity*temp_purity)+"\n")
+        purity_file_weighted.write(str(bin/100)+","+str(temp_eff)+","+str(temp_purity_weighted)+","+str(temp_rel_uncertainty_weighted)+","+str(temp_eff*temp_purity_weighted)+","+str(temp_eff*temp_purity_weighted*temp_purity_weighted)+"\n")
+
+    purity_file.close()
+    purity_file_weighted.close()
 
     # Plot efficiency/purity curves (unweighted)
 
@@ -230,8 +248,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,purity_single,color='black',label='purity',linestyle='-')
     plt.title(model_name+" Ring Classification")
     plt.xlabel("pred probability")
+    plt.ylabel("purity/efficiency")
     plt.legend()
-    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_effpurity.pdf",format="pdf")
+    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_"+dataset_name+"_"+variable_config+"_effpurity.pdf",format="pdf")
     plt.clf()
 
     # Plot efficiency/purity curves (weighted)
@@ -242,8 +261,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,purity_weighted_single,color='black',label='purity',linestyle='-')
     plt.title(model_name+" Ring Classification (weighted)")
     plt.xlabel("pred probability")
+    plt.ylabel("purity/efficiency")
     plt.legend()
-    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_effpurity_weighted.pdf",format="pdf")
+    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_"+dataset_name+"_"+variable_config+"_effpurity_weighted.pdf",format="pdf")
     plt.clf()
 
     # Plot relative uncertainty curves (unweighted)
@@ -252,8 +272,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,rel_uncertainty_single,color='black',label='rel uncertainty',linestyle='-')
     plt.title(model_name+" Ring Classification")
     plt.xlabel("pred probability")
+    plt.ylabel("$\sqrt{S+2B}/S$")
     plt.legend()
-    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_reluncert.pdf",format="pdf")
+    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_"+dataset_name+"_"+variable_config+"_reluncert.pdf",format="pdf")
     plt.clf()
  
     # Plot relative uncertainty curves (weighted)
@@ -262,8 +283,9 @@ def plot_purity(model, model_name):
     plt.plot(x_values,rel_uncertainty_weighted_single,color='black',label='rel uncertainty',linestyle='-')
     plt.title(model_name+" Ring Classification (weighted)")
     plt.xlabel("pred probability")
+    plt.ylabel("$\sqrt{S+2B}/S$")
     plt.legend()
-    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_reluncert_weighted.pdf",format="pdf")
+    plt.savefig("plots/RingClassification/PredProbability/"+model_name+"_RingClassification_"+dataset_name+"_"+variable_config+"_reluncert_weighted.pdf",format="pdf")
     plt.clf()
 
 

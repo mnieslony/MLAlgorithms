@@ -32,15 +32,17 @@ import argparse
 #------- Parse user arguments ----
 
 parser = argparse.ArgumentParser(description='Ring Classification training - Overview')
-parser.add_argument("--input", default="data.nosync/beam_muon_FV_PMTVol_SingleMultiRing_DigitThr10_wPhi_0_4996_Old.csv", help = "The electron input file [csv-format]")
-parser.add_argument("--status_suffix", default="Old.csv", help = "The strings of the input file to be replaced when looking at the status file.")
-parser.add_argument("--variable_names", default="VariableConfig_Old.txt", help = "File containing the list of classification variables")
+parser.add_argument("--input", default="data_new.nosync/beam_DigitThr10_0_4996_Full.csv", help = "The electron input file [csv-format]")
+parser.add_argument("--status_suffix", default="Full.csv", help = "The strings of the input file to be replaced when looking at the status file.")
+parser.add_argument("--variable_names", default="VariableConfig_Full.txt", help = "File containing the list of classification variables")
 parser.add_argument("--model_name",default="MLP",help="Classififier to use for training. Options: RandomForest, XGBoost, SVM, SGD, MLP, GradientBoosting, All")
 parser.add_argument("--dataset_name",default="beam",help="Keyword describing dataset name (used to label output files)")
 parser.add_argument("--balance_data",default=True,help="Should the dataset be made even for the training process?")
 parser.add_argument("--plot_roc",default=False,help="Shall ROC curve be drawn?")
 parser.add_argument("--plot_prec_recall",default=False,help="Shall Precision-Recall curve be drawn?")
 parser.add_argument("--plot_correlation",default=False,help="Shall variable correlation plots be drawn?")
+parser.add_argument("--require_mrd",default=False,help="Only look at events that have MRD hits?")
+parser.add_argument("--require_muon",default=False,help="Only look at events that have a muon?")
 
 args = parser.parse_args()
 input_file = args.input
@@ -52,6 +54,8 @@ balance_data = args.balance_data
 do_plot_roc = args.plot_roc
 do_plot_precision_recall = args.plot_prec_recall
 do_plot_correlation = args.plot_correlation
+do_require_mrd = args.require_mrd
+do_require_muon = args.require_muon
 
 print('Ring Classification initialization: Input_file: '+input_file+', variable file: '+variable_file+', model_name: '+model_name)
 
@@ -59,20 +63,19 @@ print('Ring Classification initialization: Input_file: '+input_file+', variable 
 #------- Read in .csv file -------
 
 data = pd.read_csv(input_file, header = 0)   #first row is header
-data['multiplerings'] = data['multiplerings'].astype('str')
-data.replace({'multiplerings':{'0':'1-ring',str(1):'multi-ring'}},inplace=True)
 
 #------ Load variable config --------
 
-with open(variable_file) as f:
+variable_file_path = "variable_config/"+variable_file
+with open(variable_file_path) as f:
     subset_variables = f.read().splitlines()
 subset_classification_vars = subset_variables
-subset_variables.append('multiplerings')
 print('Subset of variables: ',subset_variables)
 data = data[subset_variables]
 
 variable_config = variable_file[15:variable_file.find('.txt')]
 print('Variable configuration name: ',variable_config)
+
 
 # ------- Load additional information -------
 
@@ -83,7 +86,9 @@ data_additional = pd.read_csv(input_file_additional, header = 0)
 print('data_additional (preview): ',data_additional.head())
 
 feature_labels_additional = list(data_additional.columns)
+feature_labels_additional.remove("MCMultiRing")
 print('feature_labels_additional: ',feature_labels_additional)
+
 
 # ------- Combine data and additional_data to keep label information -------
 
@@ -93,19 +98,46 @@ print('shape data_additional: ',data_additional.shape)
 data_additional = pd.concat([data,data_additional], axis = 1, sort = False)
 print('balanced_data_additional preview: ',data_additional.head())
 
+data_additional['MCMultiRing'] = data_additional['MCMultiRing'].astype('str')
+data_additional.replace({'MCMultiRing':{'0':'1-ring',str(1):'multi-ring'}},inplace=True)
+
+subset_variables.append('MCMultiRing')
+
+# ------- Load pion energy information --------
+
+input_file_pion = input_file[0:input_file.find(status_suffix)]+"pion_energies.csv"
+print('input_file_pions: ',input_file_pion)
+
+data_pion = pd.read_csv(input_file_pion, header = 0)
+print('data_pion (preview): ',data_pion.head())
+
+feature_labels_pion = list(data_pion.columns)
+print('feature_labels_pion: ',feature_labels_pion)
+
+data_additional = pd.concat([data_additional,data_pion], axis = 1, sort = False)
+
+
+# ------ Remove unwanted events (if specified) -------------------------
+if do_require_muon:
+    data_additional.drop(data_additional[data_additional.MCPDG !=13].index, inplace=True)
+
+if do_require_mrd:
+    data_additional.drop(data_additional[data_additional.MrdLayers > 0].index, inplace=True)
+
+
 # ----- Balance data (if specified) --------
 
 if balance_data:
     # Balance data to be 50% single ring, 50% multi ring
-    balanced_data = data_additional.groupby('multiplerings')
+    balanced_data = data_additional.groupby('MCMultiRing')
     balanced_data = (balanced_data.apply(lambda x: x.sample(balanced_data.size().min()).reset_index(drop=True)))
 else:
     balanced_data = data_additional
 
 # -------- Populate arrays for classification ----------
 
-X = balanced_data.loc[:, balanced_data.columns!='multiplerings']
-y = balanced_data.iloc[:, balanced_data.columns=='multiplerings']
+X = balanced_data.loc[:, balanced_data.columns!='MCMultiRing']
+y = balanced_data.iloc[:, balanced_data.columns=='MCMultiRing']
 print("Preview X (classification variables): ",X.head())
 print("Preview Y (class names): ",y.head())
 
@@ -119,18 +151,20 @@ X_train0, X_test0, y_train, y_test = train_test_split(X, y, test_size = 0.4, ran
 
 X_test_indices = X_test0.index.get_level_values(1)
 print("Test set indices: ",X_test_indices)
-index_file = open("predictions/RingClassification/RingClassification_Indices_"+dataset_name+"_"+variable_config+".dat","w")
+index_file = open("indices/RingClassification/RingClassification_Indices_"+dataset_name+"_"+variable_config+".dat","w")
 for index in X_test_indices:
     index_file.write("%i\n" % index)
 index_file.close()
 
-X_test0.to_csv('predictions/RingClassification/RingClassification_AddEvInfo_'+dataset_name+"_"+variable_config+'.csv')
+X_test0.to_csv('additional_event_info.nosync/RingClassification/RingClassification_AddEvInfo_'+dataset_name+"_"+variable_config+'.csv')
 
 # After saving the information, drop the additional variables from the training & test data
 
 
 X_train0.drop(columns=feature_labels_additional,axis=1,inplace=True)
 X_test0.drop(columns=feature_labels_additional,axis=1,inplace=True)
+X_train0.drop(columns=feature_labels_pion,axis=1,inplace=True)
+X_test0.drop(columns=feature_labels_pion,axis=1,inplace=True)
 print("Shape of X_train0 after dropping additional variables: ",X_train0.shape,", shape of X_test0 after dropping additional variables: ",X_test0.shape)
 print("Preview of X_train0 after dropping additional variables: ",X_train0.head())
 
@@ -189,7 +223,7 @@ def run_model(model, alg_name):
     np.where(y_pred_binary == '1-ring', 0, 1)
     accuracy =  accuracy_score(y_test, y_pred) * 100 #returns the fraction of correctly classified samples
     print("Algorithm name: ",alg_name)
-    file = open("predictions/RingClassification/RingClassification_Accuracy_"+dataset_name+"_"+variable_config+".dat","a")
+    file = open("accuracy/RingClassification/RingClassification_Accuracy_"+dataset_name+"_"+variable_config+".dat","a")
     file.write("%s \t %1.3f \n" % (alg_name, accuracy))
     file.close()
 
